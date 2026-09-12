@@ -5,17 +5,28 @@ import {
   SettingsData,
 } from "@/types/market";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "/api";
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_URL ||
+  (typeof window !== "undefined"
+    ? `${window.location.protocol}//${window.location.hostname}:8000/api`
+    : "http://127.0.0.1:8000/api");
 
 export async function fetchAnalysis(symbol: string): Promise<FullAnalysisData> {
-  const res = await fetch(`${API_BASE}/analysis?symbol=${encodeURIComponent(symbol)}`, {
-    cache: "no-store",
-  });
-  if (!res.ok) {
-    const errorData = await res.json().catch(() => ({ detail: "Failed to fetch analysis" }));
-    throw new Error(errorData.detail || "Failed to fetch analysis");
+  try {
+    const res = await fetch(`${API_BASE}/analysis?symbol=${encodeURIComponent(symbol)}`, {
+      cache: "no-store",
+    });
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({ detail: `HTTP ${res.status}: Failed to fetch analysis` }));
+      throw new Error(errorData.detail || "Failed to fetch analysis");
+    }
+    return res.json();
+  } catch (err: any) {
+    if (err.message && (err.message.includes("Failed to fetch") || err.message.includes("NetworkError") || err.message.includes("refused"))) {
+      throw new Error("Cannot connect to FastAPI backend at http://127.0.0.1:8000. Please make sure the Python server is running (`python run.py`).");
+    }
+    throw err;
   }
-  return res.json();
 }
 
 export async function fetchCandles(symbol: string, timeframe: string = "1h", limit: number = 45): Promise<Candle[]> {
