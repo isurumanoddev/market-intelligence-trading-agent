@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Market Intelligence & AI Trading Agent</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <!-- Header Bar -->
+  <header class="app-header">
+    <div class="header-left">
+      <div class="logo">
+        <span class="logo-icon">⚡</span>
+        <div class="logo-text">
+          <span class="logo-title">QUANT<span class="accent-text">MIND</span> AI</span>
+          <span class="logo-sub">Multi-Agent Market Intelligence & Execution</span>
+        </div>
+      </div>
+
+      <!-- Quick Symbol Selectors -->
+      <div class="symbol-bar">
+        <button class="sym-btn active" data-sym="BTC/USDT">BTC/USDT</button>
+        <button class="sym-btn" data-sym="ETH/USDT">ETH/USDT</button>
+        <button class="sym-btn" data-sym="SOL/USDT">SOL/USDT</button>
+        <button class="sym-btn" data-sym="AAPL">AAPL</button>
+        <button class="sym-btn" data-sym="NVDA">NVDA</button>
+        <button class="sym-btn" data-sym="TSLA">TSLA</button>
+        <div class="custom-sym-box">
+          <input type="text" id="custom-symbol-input" placeholder="Symbol (e.g. XRP/USDT)" />
+          <button id="custom-symbol-btn">Go</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="header-right">
+      <div class="status-badge live">
+        <span class="pulse-dot"></span> LIVE FEED
+      </div>
+      <button id="gemini-status-btn" class="gemini-badge" title="Click to configure Gemini API Key">
+        <span id="gemini-icon">✦</span>
+        <span id="gemini-status-text">Gemini AI</span>
+      </button>
+      <div class="refresh-controls">
+        <label for="auto-refresh-select">Refresh:</label>
+        <select id="auto-refresh-select">
+          <option value="0">Manual</option>
+          <option value="10000" selected>10s</option>
+          <option value="30000">30s</option>
+          <option value="60000">60s</option>
+        </select>
+        <button id="refresh-now-btn" class="btn-primary">
+          <span class="refresh-icon">↻</span> Run Analysis
+        </button>
+      </div>
+      <button id="open-settings-btn" class="icon-btn" title="Settings">⚙</button>
+    </div>
+  </header>
+
+  <!-- Market Metric Banner -->
+  <section class="ticker-banner">
+    <div class="ticker-item primary">
+      <span class="ticker-label" id="current-symbol-label">BTC/USDT</span>
+      <span class="ticker-price" id="current-price-val">$0.00</span>
+      <span class="ticker-change" id="current-change-val">+0.00%</span>
+    </div>
+
+    <div class="ticker-divider"></div>
+
+    <div class="ticker-item">
+      <span class="ticker-label">24h High / Low</span>
+      <span class="ticker-val" id="high-low-val">$0.00 / $0.00</span>
+    </div>
+
+    <div class="ticker-item">
+      <span class="ticker-label">24h Volume</span>
+      <span class="ticker-val" id="volume-24h-val">0.00</span>
+    </div>
+
+    <div class="ticker-divider"></div>
+
+    <!-- Order Book Imbalance Gauge -->
+    <div class="ticker-item wide">
+      <div class="imbalance-header">
+        <span class="ticker-label">Order Book Imbalance (OBI)</span>
+        <span class="imbalance-tag" id="obi-tag">0.00%</span>
+      </div>
+      <div class="imbalance-bar-container">
+        <div class="imbalance-bids" id="obi-bid-fill" style="width: 50%"></div>
+        <div class="imbalance-asks" id="obi-ask-fill" style="width: 50%"></div>
+      </div>
+      <div class="imbalance-labels">
+        <span class="bid-text">Bids: <span id="obi-bid-val">$0</span></span>
+        <span class="ask-text">Asks: <span id="obi-ask-val">$0</span></span>
+      </div>
+    </div>
+
+    <div class="ticker-divider"></div>
+
+    <div class="ticker-item">
+      <span class="ticker-label">Cumulative Vol Delta (CVD)</span>
+      <span class="ticker-val cvd-badge" id="cvd-val">0.00 (Balanced)</span>
+    </div>
+
+    <div class="ticker-item">
+      <span class="ticker-label">Spread</span>
+      <span class="ticker-val" id="spread-val">0.00% (0.0 bps)</span>
+    </div>
+  </section>
+
+  <!-- Main Grid Layout -->
+  <main class="main-dashboard-grid">
+    <!-- LEFT PANEL: Technical Chart & Quant Indicators -->
+    <section class="panel left-panel">
+      <div class="panel-header">
+        <div class="panel-title">
+          <span>📈 Price Action & Candlesticks</span>
+          <span class="sub-tag" id="exchange-badge">KRAKEN</span>
+        </div>
+        <div class="chart-timeframe-selector">
+          <button class="tf-btn" data-tf="5m">5m</button>
+          <button class="tf-btn" data-tf="15m">15m</button>
+          <button class="tf-btn active" data-tf="1h">1h</button>
+          <button class="tf-btn" data-tf="1d">1d</button>
+        </div>
+      </div>
+
+      <!-- Chart Container -->
+      <div class="chart-box" id="candlestick-chart-box">
+        <svg id="candlestick-svg" width="100%" height="280"></svg>
+        <div id="chart-tooltip" class="chart-tooltip hidden"></div>
+      </div>
+
+      <!-- Technical Indicator Meters -->
+      <div class="panel-subtitle">Quantitative Signal Oscillators</div>
+      <div class="indicator-grid">
+        <div class="indicator-card">
+          <div class="ind-label">RSI (14)</div>
+          <div class="ind-value" id="rsi-val">--</div>
+          <div class="ind-badge" id="rsi-badge">NEUTRAL</div>
+        </div>
+
+        <div class="indicator-card">
+          <div class="ind-label">Trend Alignment</div>
+          <div class="ind-value" id="trend-val">--</div>
+          <div class="ind-badge" id="trend-badge">EMA 20/50</div>
+        </div>
+
+        <div class="indicator-card">
+          <div class="ind-label">MACD Momentum</div>
+          <div class="ind-value" id="macd-val">--</div>
+          <div class="ind-badge" id="macd-badge">HISTOGRAM</div>
+        </div>
+
+        <div class="indicator-card">
+          <div class="ind-label">VWAP vs Price</div>
+          <div class="ind-value" id="vwap-val">--</div>
+          <div class="ind-badge" id="vwap-badge">BENCHMARK</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CENTER PANEL: Order Book Depth & Trade Tape -->
+    <section class="panel center-panel">
+      <div class="panel-tabs">
+        <button class="tab-btn active" data-tab="orderbook-tab">Depth Ladder (Order Book)</button>
+        <button class="tab-btn" data-tab="tape-tab">Trade Tape (Time & Sales)</button>
+      </div>
+
+      <!-- TAB 1: Order Book Ladder -->
+      <div class="tab-content active" id="orderbook-tab">
+        <div class="book-header">
+          <span>Price ($)</span>
+          <span>Size</span>
+          <span>Total Depth</span>
+        </div>
+
+        <!-- Asks (Red, sorted high to low) -->
+        <div class="book-container asks" id="orderbook-asks"></div>
+
+        <!-- Center Spread Strip -->
+        <div class="book-spread-strip" id="book-spread-strip">
+          <span id="book-mid-price">--</span>
+          <span class="spread-info" id="book-spread-info">Spread: --</span>
+        </div>
+
+        <!-- Bids (Green, sorted high to low) -->
+        <div class="book-container bids" id="orderbook-bids"></div>
+
+        <!-- Liquidity Wall Highlights -->
+        <div class="wall-alerts-box" id="wall-alerts-box">
+          <div class="wall-title">Detected Liquidity Blocks:</div>
+          <div id="wall-items">No abnormal walls.</div>
+        </div>
+      </div>
+
+      <!-- TAB 2: Trade Tape -->
+      <div class="tab-content" id="tape-tab">
+        <div class="tape-header">
+          <span>Time</span>
+          <span>Side</span>
+          <span>Price ($)</span>
+          <span>Amount</span>
+          <span>Cost ($)</span>
+        </div>
+        <div class="tape-scroll-list" id="trade-tape-list"></div>
+      </div>
+    </section>
+
+    <!-- RIGHT PANEL: AI Master Decision Engine & News Catalyst Feed -->
+    <section class="panel right-panel">
+      <div class="decision-card-container">
+        <!-- AI Decision Master Card -->
+        <div class="master-decision-card" id="master-decision-card">
+          <div class="decision-header">
+            <span class="card-caption">AI MASTER TRADING ARBITER</span>
+            <span class="model-badge" id="decision-model-tag">Gemini / Quant</span>
+          </div>
+
+          <div class="decision-body">
+            <div class="decision-action-block">
+              <span class="action-badge" id="decision-action-badge">ANALYZING</span>
+              <div class="conviction-meter">
+                <div class="conviction-label">
+                  <span>Conviction</span>
+                  <span id="conviction-pct">0%</span>
+                </div>
+                <div class="conviction-bar-bg">
+                  <div class="conviction-bar-fill" id="conviction-bar-fill" style="width: 0%"></div>
+                </div>
+              </div>
+            </div>
+
+            <p class="decision-summary" id="decision-summary-text">
+              Ingesting real-time prices, order book microstructure, trades tape, and financial news...
+            </p>
+
+            <!-- Trade Execution Execution Setup -->
+            <div class="execution-levels-grid">
+              <div class="exec-col">
+                <span class="exec-label">Entry Range</span>
+                <span class="exec-val" id="exec-entry">--</span>
+              </div>
+              <div class="exec-col">
+                <span class="exec-label">Stop-Loss</span>
+                <span class="exec-val red-text" id="exec-sl">--</span>
+              </div>
+              <div class="exec-col">
+                <span class="exec-label">Take Profit 1</span>
+                <span class="exec-val green-text" id="exec-tp1">--</span>
+              </div>
+              <div class="exec-col">
+                <span class="exec-label">Risk/Reward</span>
+                <span class="exec-val" id="exec-rr">--</span>
+              </div>
+            </div>
+
+            <div class="decision-action-row">
+              <button id="btn-execute-paper-trade" class="btn-execute">
+                ⚡ Execute Paper Trade (<span id="exec-suggested-side">BUY</span>)
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Specialist Reasoning Views Accordion -->
+        <div class="specialist-tabs">
+          <button class="spec-tab active" data-spec="spec-confluence">Confluence Reasons</button>
+          <button class="spec-tab" data-spec="spec-micro">Order Book</button>
+          <button class="spec-tab" data-spec="spec-news">News & Macro</button>
+          <button class="spec-tab" data-spec="spec-risk">Risk Guardrail</button>
+        </div>
+
+        <div class="spec-content active" id="spec-confluence">
+          <ul class="reasons-list" id="confluence-reasons-list">
+            <li>Awaiting analysis...</li>
+          </ul>
+        </div>
+        <div class="spec-content" id="spec-micro">
+          <p id="micro-view-text" class="spec-text">Awaiting microstructure synthesis...</p>
+        </div>
+        <div class="spec-content" id="spec-news">
+          <p id="news-view-text" class="spec-text">Awaiting news sentiment synthesis...</p>
+        </div>
+        <div class="spec-content" id="spec-risk">
+          <p id="risk-view-text" class="spec-text">Awaiting risk budget evaluation...</p>
+        </div>
+      </div>
+
+      <!-- Real-Time News Feed Accordion -->
+      <div class="news-feed-section">
+        <div class="news-feed-header">
+          <span>📰 Live Market News & Sentiment</span>
+          <span class="news-sentiment-badge" id="news-overall-tag">NEUTRAL</span>
+        </div>
+        <div class="news-items-scroll" id="news-items-scroll">
+          <div class="loading-news">Loading news feeds...</div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- BOTTOM PANEL: Paper Trading Portfolio -->
+  <footer class="portfolio-panel">
+    <div class="portfolio-header">
+      <div class="portfolio-title">
+        <span>💼 Paper Trading Simulator</span>
+        <span class="sub-tag">Institutional Margin & Risk Control</span>
+      </div>
+      <div class="portfolio-metrics">
+        <div class="p-stat">
+          <span class="p-label">Cash Balance</span>
+          <span class="p-val" id="port-cash">$100,000.00</span>
+        </div>
+        <div class="p-stat">
+          <span class="p-label">Total Equity</span>
+          <span class="p-val" id="port-equity">$100,000.00</span>
+        </div>
+        <div class="p-stat">
+          <span class="p-label">Total PnL</span>
+          <span class="p-val" id="port-pnl">$0.00 (0.00%)</span>
+        </div>
+        <div class="p-stat">
+          <span class="p-label">Open Positions</span>
+          <span class="p-val" id="port-open-count">0</span>
+        </div>
+        <button id="port-reset-btn" class="btn-subtle" title="Reset Portfolio Balance">Reset</button>
+      </div>
+    </div>
+
+    <!-- Active Positions Table -->
+    <div class="positions-table-wrap">
+      <table class="positions-table">
+        <thead>
+          <tr>
+            <th>Symbol</th>
+            <th>Side</th>
+            <th>Size</th>
+            <th>Entry Price</th>
+            <th>Mark Price</th>
+            <th>Cost Basis</th>
+            <th>Current Value</th>
+            <th>Unrealized PnL</th>
+            <th>Stop Loss</th>
+            <th>Take Profit</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="positions-tbody">
+          <tr>
+            <td colspan="11" class="empty-row">No active open positions. Execute a trade using the AI Decision button above.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </footer>
+
+  <!-- Settings Modal -->
+  <div id="settings-modal" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>⚙ System & Agent Settings</h3>
+        <button id="close-settings-modal" class="close-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="input-gemini-key">Google Gemini API Key:</label>
+          <input type="password" id="input-gemini-key" placeholder="Enter your Gemini API Key..." />
+          <small>Enables deep reasoning for the AI Master Trading Arbiter and semantic news analysis. (Leave empty to use built-in quantitative heuristic engine).</small>
+        </div>
+
+        <div class="form-group">
+          <label for="select-default-exchange">Default Exchange:</label>
+          <select id="select-default-exchange">
+            <option value="kraken">Kraken</option>
+            <option value="coinbase">Coinbase</option>
+            <option value="binance">Binance</option>
+            <option value="bybit">Bybit</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="input-risk-trade">Max Risk Per Trade (%):</label>
+          <input type="number" id="input-risk-trade" min="0.5" max="10.0" step="0.5" value="2.0" />
+        </div>
+
+        <div class="form-group">
+          <label for="input-max-spread">Max Spread Limit (%):</label>
+          <input type="number" id="input-max-spread" min="0.1" max="2.0" step="0.1" value="0.5" />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-save-settings" class="btn-primary">Save Settings</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
