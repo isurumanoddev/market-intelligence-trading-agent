@@ -15,7 +15,7 @@ export const DecisionCard: React.FC<DecisionCardProps> = ({
   onExecuteTrade,
   isExecuting,
 }) => {
-  const [activeTab, setActiveTab] = useState<"confluence" | "macro" | "micro" | "news" | "risk">("confluence");
+  const [activeTab, setActiveTab] = useState<"confluence" | "macro" | "forecast" | "micro" | "news" | "risk">("confluence");
 
   if (!decision) {
     return (
@@ -144,6 +144,16 @@ export const DecisionCard: React.FC<DecisionCardProps> = ({
             30D Macro
           </button>
           <button
+            onClick={() => setActiveTab("forecast")}
+            className={`px-2 py-0.5 text-[11px] rounded transition-colors ${
+              activeTab === "forecast"
+                ? "bg-cyan-950/80 text-cyan-300 font-semibold border border-cyan-500/40 shadow-sm"
+                : "text-slate-500 hover:text-slate-300"
+            }`}
+          >
+            🔮 AI Forecast
+          </button>
+          <button
             onClick={() => setActiveTab("micro")}
             className={`px-2 py-0.5 text-[11px] rounded transition-colors ${
               activeTab === "micro"
@@ -210,6 +220,50 @@ export const DecisionCard: React.FC<DecisionCardProps> = ({
                     <span className="text-cyan-400 font-bold">{monthly.volume_trend}</span>
                   </div>
                 </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === "forecast" && (
+            <div className="flex flex-col gap-2 font-mono">
+              {decision.price_forecast ? (
+                <>
+                  <div className="flex justify-between items-center text-[10px]">
+                    <span className="text-slate-400 truncate max-w-[240px]">{decision.price_forecast.model_architecture}</span>
+                    <span className="px-1.5 py-0.2 rounded bg-cyan-500/20 text-cyan-400 font-bold shrink-0">
+                      {decision.price_forecast.confidence_score}% Confidence
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 bg-[#090d15] p-2 rounded border border-slate-800 text-[11px]">
+                    <div className="flex flex-col">
+                      <span className="text-[9px] text-slate-500 uppercase">7-Day Target</span>
+                      <div className="flex items-baseline gap-1.5">
+                        <span className="text-white font-bold">${formatPrice(decision.price_forecast.target_7d)}</span>
+                        <span className={`text-[10px] font-bold ${decision.price_forecast.expected_return_7d_pct >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                          {decision.price_forecast.expected_return_7d_pct >= 0 ? "+" : ""}{decision.price_forecast.expected_return_7d_pct.toFixed(1)}%
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-[9px] text-slate-500 uppercase">30-Day Target</span>
+                      <div className="flex items-baseline gap-1.5">
+                        <span className="text-white font-bold">${formatPrice(decision.price_forecast.target_30d)}</span>
+                        <span className={`text-[10px] font-bold ${decision.price_forecast.expected_return_30d_pct >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                          {decision.price_forecast.expected_return_30d_pct >= 0 ? "+" : ""}{decision.price_forecast.expected_return_30d_pct.toFixed(1)}%
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex justify-between text-[10px] text-slate-400 px-0.5">
+                    <span>Floor: <strong className="text-rose-400">${formatPrice(decision.price_forecast.projected_range_min)}</strong></span>
+                    <span>Ceiling: <strong className="text-emerald-400">${formatPrice(decision.price_forecast.projected_range_max)}</strong></span>
+                  </div>
+                  <p className="font-sans text-slate-300 text-[11px] leading-snug">
+                    {decision.price_forecast.rationale}
+                  </p>
+                </>
+              ) : (
+                <p className="font-sans text-slate-400">Forecasting engine is generating multi-horizon trajectory...</p>
               )}
             </div>
           )}

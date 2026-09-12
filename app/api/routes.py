@@ -7,6 +7,7 @@ from app.services.market_service import market_service
 from app.services.news_service import news_service
 from app.services.technical_analysis import technical_analyzer
 from app.services.paper_broker import paper_broker
+from app.services.forecasting_service import forecasting_service
 from app.agents.sentiment_agent import sentiment_agent
 from app.agents.master_trading_agent import master_trading_agent
 
@@ -82,12 +83,39 @@ async def get_news(symbol: str = Query(default="BTC/USDT"), limit: int = Query(d
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+@router.get("/market/forecast")
+async def get_price_forecast(
+    symbol: str = Query(default="BTC/USDT"),
+    horizon: int = Query(default=30, le=60)
+):
+    try:
+        ticker = market_service.get_ticker(symbol)
+        candles_1d = market_service.get_ohlcv(symbol, timeframe="1d", limit=60)
+        monthly_context = technical_analyzer.calculate_monthly_context(candles_1d, ticker.price)
+        raw_news = news_service.get_news_for_symbol(symbol, limit=20)
+        sentiment_metrics, _ = sentiment_agent.analyze(symbol, raw_news)
+        order_book = market_service.get_order_book(symbol, limit=20)
+        trades = market_service.get_recent_trades(symbol, limit=30)
+        microstructure = technical_analyzer.analyze_microstructure(order_book, trades)
+        
+        return forecasting_service.generate_forecast(
+            symbol=symbol,
+            current_price=ticker.price,
+            candles_1d=candles_1d,
+            microstructure=microstructure,
+            sentiment=sentiment_metrics,
+            monthly_context=monthly_context,
+            horizon_days=horizon
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 @router.get("/analysis")
 async def get_full_analysis(symbol: str = Query(default="BTC/USDT")):
     """
     Comprehensive pipeline endpoint: Fetches real-time price, order book, trade tape,
-    30-day historical macro data, computes quant indicators, analyzes news sentiment & catalysts,
-    and runs the AI Master Trading Decision Agent.
+    30-day historical macro data, computes quant indicators, generates AI price forecast,
+    analyzes news sentiment & catalysts, and runs the AI Master Trading Decision Agent.
     """
     try:
         ticker = market_service.get_ticker(symbol)
@@ -95,8 +123,8 @@ async def get_full_analysis(symbol: str = Query(default="BTC/USDT")):
         trades = market_service.get_recent_trades(symbol, limit=50)
         candles = market_service.get_ohlcv(symbol, timeframe="1h", limit=60)
         
-        # Ingest 30-day daily candles for macro historical context
-        candles_1d = market_service.get_ohlcv(symbol, timeframe="1d", limit=35)
+        # Ingest 30-day daily candles for macro historical context & forecasting
+        candles_1d = market_service.get_ohlcv(symbol, timeframe="1d", limit=45)
         
         indicators = technical_analyzer.calculate_indicators(candles)
         microstructure = technical_analyzer.analyze_microstructure(order_book, trades)
@@ -105,6 +133,18 @@ async def get_full_analysis(symbol: str = Query(default="BTC/USDT")):
         raw_news = news_service.get_news_for_symbol(symbol, limit=25)
         sentiment_metrics, scored_news = sentiment_agent.analyze(symbol, raw_news)
         
+        # Generate State-of-the-Art Hybrid Neural-Cognitive 30-day price forecast
+        forecast = forecasting_service.generate_forecast(
+            symbol=symbol,
+            current_price=ticker.price,
+            candles_1d=candles_1d,
+            indicators=indicators,
+            microstructure=microstructure,
+            sentiment=sentiment_metrics,
+            monthly_context=monthly_context,
+            horizon_days=30
+        )
+
         decision = master_trading_agent.evaluate(
             symbol=symbol,
             ticker=ticker,
@@ -112,7 +152,8 @@ async def get_full_analysis(symbol: str = Query(default="BTC/USDT")):
             microstructure=microstructure,
             sentiment=sentiment_metrics,
             news_items=scored_news,
-            monthly_context=monthly_context
+            monthly_context=monthly_context,
+            price_forecast=forecast
         )
 
         return {
@@ -123,6 +164,7 @@ async def get_full_analysis(symbol: str = Query(default="BTC/USDT")):
             "indicators": indicators,
             "microstructure": microstructure,
             "monthly_context": monthly_context,
+            "price_forecast": forecast,
             "sentiment": sentiment_metrics,
             "news": scored_news[:15],
             "decision": decision

@@ -196,6 +196,7 @@ export default function DashboardPage() {
           <CandleChart
             candles={candles}
             indicators={analysis?.indicators || null}
+            forecast={analysis?.price_forecast || null}
             currentTimeframe={currentTimeframe}
             onChangeTimeframe={(tf) => setCurrentTimeframe(tf)}
             exchange={analysis?.ticker?.exchange || "KRAKEN"}

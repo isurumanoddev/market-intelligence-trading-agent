@@ -139,6 +139,32 @@ export interface MonthlyContext {
   macro_bias: "BULLISH" | "BEARISH" | "NEUTRAL";
 }
 
+export interface ForecastPoint {
+  day: number;
+  date_str: string;
+  predicted_price: number;
+  upper_bound: number;
+  lower_bound: number;
+}
+
+export interface PriceForecastResult {
+  symbol: string;
+  current_price: number;
+  horizon_days: number;
+  target_7d: number;
+  target_30d: number;
+  expected_return_7d_pct: number;
+  expected_return_30d_pct: number;
+  projected_range_min: number;
+  projected_range_max: number;
+  forecast_bias: "BULLISH_EXPANSION" | "BEARISH_REVERSAL" | "RANGE_CONSOLIDATION";
+  confidence_score: number;
+  model_architecture: string;
+  trajectory: ForecastPoint[];
+  rationale: string;
+  timestamp: string;
+}
+
 export interface TradingDecision {
   symbol: string;
   action: "STRONG_BUY" | "BUY" | "HOLD" | "SELL" | "STRONG_SELL";
@@ -158,6 +184,7 @@ export interface TradingDecision {
   macro_view?: string;
   risk_view: string;
   monthly_context?: MonthlyContext | null;
+  price_forecast?: PriceForecastResult | null;
   model_used: string;
   timestamp: string;
 }
@@ -210,6 +237,7 @@ export interface FullAnalysisData {
   indicators: TechnicalIndicators;
   microstructure: MicrostructureMetrics;
   monthly_context?: MonthlyContext | null;
+  price_forecast?: PriceForecastResult | null;
   sentiment: SentimentMetrics;
   news: NewsItem[];
   decision: TradingDecision;

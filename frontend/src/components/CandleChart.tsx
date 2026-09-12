@@ -1,11 +1,13 @@
 "use client";
 
 import React, { useState, useRef } from "react";
-import { Candle, TechnicalIndicators } from "@/types/market";
+import { Candle, TechnicalIndicators, PriceForecastResult, ForecastPoint } from "@/types/market";
+import { TrendingUp, Eye, EyeOff } from "lucide-react";
 
 interface CandleChartProps {
   candles: Candle[];
   indicators: TechnicalIndicators | null;
+  forecast?: PriceForecastResult | null;
   currentTimeframe: string;
   onChangeTimeframe: (tf: string) => void;
   exchange: string;
@@ -14,11 +16,14 @@ interface CandleChartProps {
 export const CandleChart: React.FC<CandleChartProps> = ({
   candles,
   indicators,
+  forecast,
   currentTimeframe,
   onChangeTimeframe,
   exchange,
 }) => {
   const [hoveredCandle, setHoveredCandle] = useState<Candle | null>(null);
+  const [hoveredForecast, setHoveredForecast] = useState<ForecastPoint | null>(null);
+  const [showForecast, setShowForecast] = useState<boolean>(true);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const TIMEFRAMES = ["5m", "15m", "1h", "1d", "30D"];
@@ -31,38 +36,102 @@ export const CandleChart: React.FC<CandleChartProps> = ({
   const plotH = height - padding.top - padding.bottom;
 
   const validCandles = candles && candles.length > 0 ? candles : [];
-  const minPrice = validCandles.length ? Math.min(...validCandles.map((c) => c.low)) : 0;
-  const maxPrice = validCandles.length ? Math.max(...validCandles.map((c) => c.high)) : 100;
+  
+  // Forecast points to display (take 10 points spaced out across the 30-day horizon)
+  const forecastPoints = showForecast && forecast?.trajectory ? forecast.trajectory.filter((_, idx) => idx % 3 === 0 || idx === forecast.trajectory.length - 1) : [];
+  const forecastSlotCount = forecastPoints.length;
+
+  const totalSlots = validCandles.length + forecastSlotCount;
+
+  // Price scaling across both historical candles and forecast bounds
+  let minPrice = validCandles.length ? Math.min(...validCandles.map((c) => c.low)) : 0;
+  let maxPrice = validCandles.length ? Math.max(...validCandles.map((c) => c.high)) : 100;
+  
+  if (showForecast && forecastPoints.length > 0) {
+    const fMin = Math.min(...forecastPoints.map((p) => p.lower_bound));
+    const fMax = Math.max(...forecastPoints.map((p) => p.upper_bound));
+    minPrice = Math.min(minPrice, fMin * 0.98);
+    maxPrice = Math.max(maxPrice, fMax * 1.02);
+  }
+
   const priceRange = maxPrice - minPrice || 1.0;
 
   const getY = (price: number) => padding.top + plotH - ((price - minPrice) / priceRange) * plotH;
-  const getX = (i: number) => padding.left + i * (plotW / validCandles.length) + (plotW / validCandles.length) / 2;
-  const candleW = Math.max(plotW / (validCandles.length || 1) - 2.5, 2);
+  const getX = (i: number) => padding.left + i * (plotW / (totalSlots || 1)) + (plotW / (totalSlots || 1)) / 2;
+  const candleW = Math.max(plotW / (totalSlots || 1) - 2.5, 2);
+
+  // Build polygon path for shaded confidence cone
+  let conePath = "";
+  let trajectoryPath = "";
+  if (showForecast && forecastPoints.length > 0 && validCandles.length > 0) {
+    const lastIdx = validCandles.length - 1;
+    const startX = getX(lastIdx);
+    const startY = getY(validCandles[lastIdx].close);
+
+    const upperPts: { x: number; y: number }[] = [{ x: startX, y: startY }];
+    const lowerPts: { x: number; y: number }[] = [{ x: startX, y: startY }];
+    const trajPts: { x: number; y: number }[] = [{ x: startX, y: startY }];
+
+    forecastPoints.forEach((pt, i) => {
+      const fx = getX(validCandles.length + i);
+      upperPts.push({ x: fx, y: getY(pt.upper_bound) });
+      lowerPts.push({ x: fx, y: getY(pt.lower_bound) });
+      trajPts.push({ x: fx, y: getY(pt.predicted_price) });
+    });
+
+    // Generate cone polygon: upper forward, lower backward
+    const upperStr = upperPts.map((p, i) => (i === 0 ? `M ${p.x},${p.y}` : `L ${p.x},${p.y}`)).join(" ");
+    const lowerStr = lowerPts.reverse().map((p) => `L ${p.x},${p.y}`).join(" ");
+    conePath = `${upperStr} ${lowerStr} Z`;
+
+    trajectoryPath = trajPts.map((p, i) => (i === 0 ? `M ${p.x},${p.y}` : `L ${p.x},${p.y}`)).join(" ");
+  }
 
   return (
     <div className="bg-[#111622] border border-slate-800 rounded-md flex flex-col overflow-hidden">
       {/* Chart Header */}
       <div className="px-3.5 py-2.5 border-b border-slate-800 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="font-semibold text-xs text-white">📈 Price Action & Candlesticks</span>
+          <span className="font-semibold text-xs text-white flex items-center gap-1.5">
+            <TrendingUp className="w-3.5 h-3.5 text-cyan-400" />
+            Price Action & AI 30D Forecast
+          </span>
           <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#171f30] text-slate-400 font-mono">
             {exchange}
           </span>
         </div>
-        <div className="flex items-center gap-1">
-          {TIMEFRAMES.map((tf) => (
+
+        <div className="flex items-center gap-2">
+          {/* Toggle Forecast Overlay */}
+          {forecast && (
             <button
-              key={tf}
-              onClick={() => onChangeTimeframe(tf)}
-              className={`px-2 py-0.5 text-[10px] font-mono rounded transition-colors ${
-                currentTimeframe === tf
-                  ? "bg-blue-600 text-white font-semibold shadow"
-                  : "bg-[#171f30] text-slate-400 hover:text-slate-200"
+              onClick={() => setShowForecast(!showForecast)}
+              className={`flex items-center gap-1 px-2 py-0.5 text-[10px] font-mono rounded border transition-colors ${
+                showForecast
+                  ? "bg-cyan-500/15 border-cyan-500/40 text-cyan-300 font-bold"
+                  : "bg-slate-800/60 border-slate-700 text-slate-400"
               }`}
             >
-              {tf}
+              {showForecast ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+              <span>AI Forecast</span>
             </button>
-          ))}
+          )}
+
+          <div className="flex items-center gap-1">
+            {TIMEFRAMES.map((tf) => (
+              <button
+                key={tf}
+                onClick={() => onChangeTimeframe(tf)}
+                className={`px-2 py-0.5 text-[10px] font-mono rounded transition-colors ${
+                  currentTimeframe === tf
+                    ? "bg-blue-600 text-white font-semibold shadow"
+                    : "bg-[#171f30] text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                {tf}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -120,7 +189,10 @@ export const CandleChart: React.FC<CandleChartProps> = ({
                 <g
                   key={c.timestamp}
                   className="cursor-crosshair"
-                  onMouseEnter={() => setHoveredCandle(c)}
+                  onMouseEnter={() => {
+                    setHoveredCandle(c);
+                    setHoveredForecast(null);
+                  }}
                 >
                   {/* Wick */}
                   <line x1={cx} y1={wickTop} x2={cx} y2={wickBot} stroke={color} strokeWidth={1.2} />
@@ -136,10 +208,73 @@ export const CandleChart: React.FC<CandleChartProps> = ({
                 </g>
               );
             })}
+
+            {/* AI 30-Day Forecast Confidence Ribbon (Cone) */}
+            {conePath && (
+              <path
+                d={conePath}
+                fill="rgba(6, 182, 212, 0.12)"
+                stroke="rgba(6, 182, 212, 0.35)"
+                strokeWidth={1}
+                strokeDasharray="2 2"
+              />
+            )}
+
+            {/* AI 30-Day Expected Trajectory Path */}
+            {trajectoryPath && (
+              <path
+                d={trajectoryPath}
+                fill="none"
+                stroke="#06b6d4"
+                strokeWidth={2}
+                strokeDasharray="4 2.5"
+              />
+            )}
+
+            {/* Forecast Interactive Target Nodes */}
+            {showForecast && forecastPoints.map((pt, i) => {
+              const fx = getX(validCandles.length + i);
+              const fy = getY(pt.predicted_price);
+              const isTarget7 = pt.day >= 7 && pt.day <= 9;
+              const isTarget30 = pt.day === forecastPoints[forecastPoints.length - 1].day;
+
+              return (
+                <g
+                  key={pt.day}
+                  className="cursor-pointer"
+                  onMouseEnter={() => {
+                    setHoveredForecast(pt);
+                    setHoveredCandle(null);
+                  }}
+                >
+                  <circle
+                    cx={fx}
+                    cy={fy}
+                    r={isTarget7 || isTarget30 ? 4 : 2.5}
+                    fill={isTarget30 ? "#10b981" : isTarget7 ? "#38bdf8" : "#06b6d4"}
+                    stroke="#0f172a"
+                    strokeWidth={1.2}
+                  />
+                  {(isTarget7 || isTarget30) && (
+                    <text
+                      x={fx}
+                      y={fy - 7}
+                      textAnchor="middle"
+                      fill="#38bdf8"
+                      fontSize={8.5}
+                      fontFamily="JetBrains Mono"
+                      fontWeight="bold"
+                    >
+                      {isTarget30 ? "30D" : "7D"}
+                    </text>
+                  )}
+                </g>
+              );
+            })}
           </svg>
         )}
 
-        {/* Hover Tooltip */}
+        {/* Hover Tooltip (Candles) */}
         {hoveredCandle && (
           <div className="absolute top-4 left-4 bg-slate-900/90 backdrop-blur border border-slate-700 text-slate-200 text-[11px] font-mono p-2 rounded shadow-xl pointer-events-none z-10 flex gap-3">
             <span>T: {hoveredCandle.time_str}</span>
@@ -149,6 +284,20 @@ export const CandleChart: React.FC<CandleChartProps> = ({
             <span className={hoveredCandle.close >= hoveredCandle.open ? "text-emerald-400" : "text-rose-400"}>
               C: ${hoveredCandle.close.toFixed(2)}
             </span>
+          </div>
+        )}
+
+        {/* Hover Tooltip (AI Forecast Point) */}
+        {hoveredForecast && (
+          <div className="absolute top-4 left-4 bg-[#0a101d]/95 backdrop-blur border border-cyan-500/40 text-slate-200 text-[11px] font-mono p-2.5 rounded shadow-2xl pointer-events-none z-10 flex flex-col gap-1">
+            <div className="flex items-center gap-2">
+              <span className="text-cyan-400 font-bold">🔮 AI Forecast Day +{hoveredForecast.day} ({hoveredForecast.date_str})</span>
+            </div>
+            <div className="flex items-center gap-3 text-[10px]">
+              <span className="text-white font-bold">Target: ${hoveredForecast.predicted_price.toFixed(2)}</span>
+              <span className="text-slate-400">Upper (+1σ): ${hoveredForecast.upper_bound.toFixed(2)}</span>
+              <span className="text-slate-400">Lower (-1σ): ${hoveredForecast.lower_bound.toFixed(2)}</span>
+            </div>
           </div>
         )}
       </div>
