@@ -60,6 +60,18 @@ class MonthlyContext(BaseModel):
     volume_trend: str = "NORMAL"        # EXPANDING, CONTRACTING, NORMAL
     macro_bias: str = "NEUTRAL"
 
+class HorizonPrediction(BaseModel):
+    horizon: str  # "1m", "5m", "10m", "30m", "1h", "4h", "1d", "7d", "30d"
+    horizon_label: str  # "1 Min", "5 Min", "10 Min", "30 Min", "1 Hour", "4 Hours", "1 Day", "7 Days", "30 Days"
+    target_time_str: str  # e.g. "00:22", "01:21", "Sep 14", "Oct 13"
+    predicted_price: float
+    expected_change_pct: float
+    upper_bound: float
+    lower_bound: float
+    bias: str = "NEUTRAL"  # BULLISH, BEARISH, NEUTRAL
+    confidence: int = 70  # 0 to 100%
+    primary_driver: str = ""
+
 class ForecastPoint(BaseModel):
     day: int
     date_str: str
@@ -79,8 +91,9 @@ class PriceForecastResult(BaseModel):
     projected_range_max: float
     forecast_bias: str = "RANGE_CONSOLIDATION"  # BULLISH_EXPANSION, BEARISH_REVERSAL, RANGE_CONSOLIDATION
     confidence_score: int = 75  # 0 to 100%
-    model_architecture: str = "Hybrid Deep Learning LSTM + Google Gemini Cognitive Synthesis"
+    model_architecture: str = "Hybrid Multi-Horizon Deep Learning + Google Gemini Cognitive Synthesis"
     trajectory: List[ForecastPoint] = []
+    multi_horizon_predictions: List[HorizonPrediction] = []
     rationale: str = ""
     timestamp: str = ""
 

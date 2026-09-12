@@ -139,6 +139,19 @@ export interface MonthlyContext {
   macro_bias: "BULLISH" | "BEARISH" | "NEUTRAL";
 }
 
+export interface HorizonPrediction {
+  horizon: string; // "1m" | "5m" | "10m" | "30m" | "1h" | "4h" | "1d" | "7d" | "30d"
+  horizon_label: string; // "1 Min", "5 Min", etc.
+  target_time_str: string;
+  predicted_price: number;
+  expected_change_pct: number;
+  upper_bound: number;
+  lower_bound: number;
+  bias: "BULLISH" | "BEARISH" | "NEUTRAL";
+  confidence: number;
+  primary_driver: string;
+}
+
 export interface ForecastPoint {
   day: number;
   date_str: string;
@@ -161,6 +174,7 @@ export interface PriceForecastResult {
   confidence_score: number;
   model_architecture: string;
   trajectory: ForecastPoint[];
+  multi_horizon_predictions?: HorizonPrediction[];
   rationale: string;
   timestamp: string;
 }

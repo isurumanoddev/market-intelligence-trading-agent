@@ -1,4 +1,4 @@
-﻿import os
+import os
 import json
 import math
 from datetime import datetime, timedelta
@@ -7,7 +7,7 @@ import numpy as np
 
 from app.models.market_data import Candle, Ticker
 from app.models.decision import (
-    PriceForecastResult, ForecastPoint, TechnicalIndicators,
+    PriceForecastResult, ForecastPoint, HorizonPrediction, TechnicalIndicators,
     MicrostructureMetrics, SentimentMetrics, MonthlyContext
 )
 from app.config import settings
@@ -28,9 +28,10 @@ class ForecastingService:
         horizon_days: int = 30
     ) -> PriceForecastResult:
         """
-        State-of-the-Art Hybrid Neural-Cognitive Forecaster.
-        Phase 1: Deep Sequence Engine computes statistical momentum drift, autocorrelation & volatility envelope.
-        Phase 2: Cognitive LLM Arbiter (Google Gemini) calibrates path with live order book and news catalysts.
+        State-of-the-Art Multi-Horizon Hybrid Neural-Cognitive Forecaster.
+        Predicts across 9 time horizons: 1m, 5m, 10m, 30m, 1h, 4h, 1d, 7d, and 30d.
+        Synthesizes L2 order book microstructure, short-term tick momentum, technical indicators,
+        news catalyst sentiment, and long-term autoregressive sequence modeling.
         """
         base_trajectory, baseline_7d, baseline_30d, daily_vol = self._compute_sequence_baseline(
             current_price=current_price,
@@ -46,7 +47,8 @@ class ForecastingService:
         forecast_bias = "RANGE_CONSOLIDATION"
         confidence_score = 75
         rationale = ""
-        model_arch = "Deep Sequence Autoregressive Forecaster + Volatility Envelope"
+        model_arch = "Multi-Horizon Deep Sequence Forecaster + Volatility Envelopes"
+        gemini_horizon_data: Optional[Dict[str, Any]] = None
 
         if api_key:
             try:
@@ -61,12 +63,13 @@ class ForecastingService:
                     monthly_context=monthly_context,
                     api_key=api_key
                 )
-                target_7d = gemini_res.get("target_7d", baseline_7d)
-                target_30d = gemini_res.get("target_30d", baseline_30d)
+                gemini_horizon_data = gemini_res
+                target_7d = float(gemini_res.get("target_7d", baseline_7d))
+                target_30d = float(gemini_res.get("target_30d", baseline_30d))
                 forecast_bias = gemini_res.get("forecast_bias", "RANGE_CONSOLIDATION")
-                confidence_score = gemini_res.get("confidence_score", 78)
+                confidence_score = int(gemini_res.get("confidence_score", 78))
                 rationale = gemini_res.get("rationale", "")
-                model_arch = f"Hybrid Deep Learning Sequence Model + Google Gemini ({self.model_name})"
+                model_arch = f"Hybrid Multi-Horizon Sequence Model + Google Gemini ({self.model_name})"
             except Exception as e:
                 print(f"Gemini cognitive alignment error, falling back to quantitative calibration: {e}")
                 target_7d, target_30d, forecast_bias, confidence_score, rationale = self._align_deterministic(
@@ -97,11 +100,23 @@ class ForecastingService:
             horizon_days=horizon_days
         )
 
+        multi_horizon_preds = self._compute_multi_horizon_predictions(
+            current_price=current_price,
+            target_7d=target_7d,
+            target_30d=target_30d,
+            daily_vol=daily_vol,
+            indicators=indicators,
+            microstructure=microstructure,
+            sentiment=sentiment,
+            monthly_context=monthly_context,
+            gemini_horizon_data=gemini_horizon_data
+        )
+
         exp_ret_7d = ((target_7d - current_price) / current_price) * 100.0 if current_price > 0 else 0.0
         exp_ret_30d = ((target_30d - current_price) / current_price) * 100.0 if current_price > 0 else 0.0
         
-        all_lows = [p.lower_bound for p in calibrated_points]
-        all_highs = [p.upper_bound for p in calibrated_points]
+        all_lows = [p.lower_bound for p in calibrated_points] + [h.lower_bound for h in multi_horizon_preds]
+        all_highs = [p.upper_bound for p in calibrated_points] + [h.upper_bound for h in multi_horizon_preds]
         proj_min = min(all_lows) if all_lows else current_price * 0.9
         proj_max = max(all_highs) if all_highs else current_price * 1.1
 
@@ -119,6 +134,7 @@ class ForecastingService:
             confidence_score=confidence_score,
             model_architecture=model_arch,
             trajectory=calibrated_points,
+            multi_horizon_predictions=multi_horizon_preds,
             rationale=rationale,
             timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         )
@@ -171,6 +187,201 @@ class ForecastingService:
 
         return raw_points, target_7d, target_30d, daily_vol
 
+    def _compute_multi_horizon_predictions(
+        self,
+        current_price: float,
+        target_7d: float,
+        target_30d: float,
+        daily_vol: float,
+        indicators: Optional[TechnicalIndicators],
+        microstructure: Optional[MicrostructureMetrics],
+        sentiment: Optional[SentimentMetrics],
+        monthly_context: Optional[MonthlyContext],
+        gemini_horizon_data: Optional[Dict[str, Any]] = None
+    ) -> List[HorizonPrediction]:
+        now = datetime.now()
+
+        # Extract features
+        obi = microstructure.order_book_imbalance if microstructure else 0.0
+        cvd_side = microstructure.cvd_side if microstructure else "BALANCED"
+        cvd_dir = 1.0 if cvd_side == "BUY_DOMINANT" else (-1.0 if cvd_side == "SELL_DOMINANT" else 0.0)
+        bid_walls = len(microstructure.large_bid_walls) if microstructure else 0
+        ask_walls = len(microstructure.large_ask_walls) if microstructure else 0
+        wall_skew = 1.0 if bid_walls > ask_walls else (-1.0 if ask_walls > bid_walls else 0.0)
+
+        rsi = indicators.rsi if (indicators and indicators.rsi is not None) else 50.0
+        rsi_signal = 1.0 if rsi < 35 else (-1.0 if rsi > 65 else (rsi - 50.0) / 50.0)
+        macd_hist = indicators.macd_hist if (indicators and indicators.macd_hist is not None) else 0.0
+        macd_dir = 1.0 if macd_hist > 0 else (-1.0 if macd_hist < 0 else 0.0)
+        vwap = indicators.vwap if (indicators and indicators.vwap) else current_price
+        vwap_diff_pct = (vwap - current_price) / current_price if current_price > 0 else 0.0
+
+        sent_score = sentiment.overall_sentiment_score if sentiment else 0.0
+        macro_dir = 1.0 if (monthly_context and monthly_context.monthly_trend == "MACRO_BULLISH") else (-1.0 if (monthly_context and monthly_context.monthly_trend == "MACRO_BEARISH") else 0.0)
+
+        # Specifications for 9 horizons
+        specs = [
+            {
+                "id": "1m",
+                "label": "1 Min",
+                "delta": timedelta(minutes=1),
+                "time_fmt": "%H:%M:%S",
+                "dt_days": 1.0 / 1440.0,
+                "vol_scale": 1.25,
+                "calc_drift": (obi * 0.0006) + (cvd_dir * 0.0003),
+                "driver": f"L2 Order Book Imbalance ({obi:+.2f}) & {cvd_side} Taker Flow" if abs(obi) > 0.05 else "Micro-Tick Liquidity & Spread Dynamics",
+                "base_conf": int(78 + min(abs(obi) * 15, 12)),
+                "gemini_key": "target_1m"
+            },
+            {
+                "id": "5m",
+                "label": "5 Min",
+                "delta": timedelta(minutes=5),
+                "time_fmt": "%H:%M",
+                "dt_days": 5.0 / 1440.0,
+                "vol_scale": 1.30,
+                "calc_drift": (obi * 0.0010) + (wall_skew * 0.0005) + (cvd_dir * 0.0004),
+                "driver": "Order Book Wall Absorption & Depth Skew" if wall_skew != 0 else "High-Frequency Flow Persistence",
+                "base_conf": 77,
+                "gemini_key": "target_5m"
+            },
+            {
+                "id": "10m",
+                "label": "10 Min",
+                "delta": timedelta(minutes=10),
+                "time_fmt": "%H:%M",
+                "dt_days": 10.0 / 1440.0,
+                "vol_scale": 1.35,
+                "calc_drift": (obi * 0.0012) + (vwap_diff_pct * 0.10) + (cvd_dir * 0.0005),
+                "driver": "Micro-VWAP Rebalancing & Flow Velocity",
+                "base_conf": 76,
+                "gemini_key": "target_10m"
+            },
+            {
+                "id": "30m",
+                "label": "30 Min",
+                "delta": timedelta(minutes=30),
+                "time_fmt": "%H:%M",
+                "dt_days": 30.0 / 1440.0,
+                "vol_scale": 1.40,
+                "calc_drift": (vwap_diff_pct * 0.18) + (rsi_signal * 0.0018) + (obi * 0.0008) + (sent_score * 0.0012),
+                "driver": "Intraday VWAP Pull & RSI Equilibrium",
+                "base_conf": 75,
+                "gemini_key": "target_30m"
+            },
+            {
+                "id": "1h",
+                "label": "1 Hour",
+                "delta": timedelta(hours=1),
+                "time_fmt": "%H:%M",
+                "dt_days": 1.0 / 24.0,
+                "vol_scale": 1.45,
+                "calc_drift": (rsi_signal * 0.003) + (macd_dir * 0.0025) + (sent_score * 0.0025) + (vwap_diff_pct * 0.15),
+                "driver": "1H RSI/MACD Momentum & Catalyst Sentiment",
+                "base_conf": 76,
+                "gemini_key": "target_1h"
+            },
+            {
+                "id": "4h",
+                "label": "4 Hours",
+                "delta": timedelta(hours=4),
+                "time_fmt": "%H:%M",
+                "dt_days": 4.0 / 24.0,
+                "vol_scale": 1.50,
+                "calc_drift": (macd_dir * 0.005) + (sent_score * 0.004) + (macro_dir * 0.0035),
+                "driver": "4H Session Trend & Catalyst Narrative",
+                "base_conf": 76,
+                "gemini_key": "target_4h"
+            },
+            {
+                "id": "1d",
+                "label": "1 Day",
+                "delta": timedelta(days=1),
+                "time_fmt": "%b %d",
+                "dt_days": 1.0,
+                "vol_scale": 1.50,
+                "calc_drift": ((target_7d - current_price) / current_price) * 0.16 if current_price > 0 else 0.0,
+                "driver": "Daily Trend Structure & News Sentiment",
+                "base_conf": 78,
+                "gemini_key": "target_1d"
+            },
+            {
+                "id": "7d",
+                "label": "7 Days",
+                "delta": timedelta(days=7),
+                "time_fmt": "%b %d",
+                "dt_days": 7.0,
+                "vol_scale": 1.55,
+                "calc_drift": ((target_7d - current_price) / current_price) if current_price > 0 else 0.0,
+                "driver": "7-Day Sequence Drift & Key Levels",
+                "base_conf": 80,
+                "gemini_key": "target_7d"
+            },
+            {
+                "id": "30d",
+                "label": "30 Days",
+                "delta": timedelta(days=30),
+                "time_fmt": "%b %d",
+                "dt_days": 30.0,
+                "vol_scale": 1.60,
+                "calc_drift": ((target_30d - current_price) / current_price) if current_price > 0 else 0.0,
+                "driver": "30-Day Macro Cycle & Cognitive Synthesis",
+                "base_conf": 75,
+                "gemini_key": "target_30d"
+            }
+        ]
+
+        predictions: List[HorizonPrediction] = []
+
+        for spec in specs:
+            target_time_str = (now + spec["delta"]).strftime(spec["time_fmt"])
+            dt = spec["dt_days"]
+            vol_spread = current_price * daily_vol * math.sqrt(dt) * spec["vol_scale"]
+
+            # Check if Gemini provided a calibrated target
+            gemini_val = gemini_horizon_data.get(spec["gemini_key"]) if gemini_horizon_data else None
+            
+            if gemini_val is not None and isinstance(gemini_val, (int, float)) and gemini_val > 0:
+                p_pred = float(gemini_val)
+            elif spec["id"] == "7d":
+                p_pred = target_7d
+            elif spec["id"] == "30d":
+                p_pred = target_30d
+            else:
+                p_pred = current_price * (1.0 + spec["calc_drift"])
+
+            p_upper = p_pred + vol_spread
+            p_lower = max(p_pred - vol_spread, current_price * 0.3)
+
+            exp_chg = ((p_pred - current_price) / current_price) * 100.0 if current_price > 0 else 0.0
+
+            threshold = 0.015 if spec["dt_days"] <= (5.0 / 1440.0) else (0.05 if spec["dt_days"] <= (1.0 / 24.0) else 0.25)
+            if exp_chg > threshold:
+                bias = "BULLISH"
+            elif exp_chg < -threshold:
+                bias = "BEARISH"
+            else:
+                bias = "NEUTRAL"
+
+            conf = spec["base_conf"]
+            if gemini_horizon_data and "confidence_score" in gemini_horizon_data:
+                conf = int((conf + gemini_horizon_data["confidence_score"]) / 2)
+
+            predictions.append(HorizonPrediction(
+                horizon=spec["id"],
+                horizon_label=spec["label"],
+                target_time_str=target_time_str,
+                predicted_price=round(p_pred, 2),
+                expected_change_pct=round(exp_chg, 2),
+                upper_bound=round(p_upper, 2),
+                lower_bound=round(p_lower, 2),
+                bias=bias,
+                confidence=conf,
+                primary_driver=spec["driver"]
+            ))
+
+        return predictions
+
     def _align_with_gemini(
         self,
         symbol: str,
@@ -190,37 +401,42 @@ class ForecastingService:
 
         prompt = f"""
 You are the Lead Quantitative Forecaster and Multi-Asset Portfolio Strategist.
-Calibrate a 30-day mathematical neural network forecast for '{symbol}'.
+Predict price targets for '{symbol}' across 9 temporal horizons: 1m, 5m, 10m, 30m, 1h, 4h, 1d, 7d, 30d.
 
-CURRENT MARKET DATA:
+CURRENT MARKET SNAPSHOT:
 - Current Price: ${current_price:,.2f}
-- Statistical LSTM Sequence Baseline (7-Day Target): ${baseline_7d:,.2f}
-- Statistical LSTM Sequence Baseline (30-Day Target): ${baseline_30d:,.2f}
+- Statistical Sequence 7-Day Baseline: ${baseline_7d:,.2f}
+- Statistical Sequence 30-Day Baseline: ${baseline_30d:,.2f}
 
-30-DAY MACRO CONTEXT:
-- 30d Range: ${monthly_context.monthly_low if monthly_context else 0:,.2f} to ${monthly_context.monthly_high if monthly_context else 0:,.2f}
-- Monthly Trend: {monthly_context.monthly_trend if monthly_context else 'RANGE_BOUND'}
-- Key Monthly Support: ${monthly_context.key_monthly_support if monthly_context else 0:,.2f}
-- Key Monthly Resistance: ${monthly_context.key_monthly_resistance if monthly_context else 0:,.2f}
-
-MICROSTRUCTURE & ORDER BOOK:
+ORDER BOOK MICROSTRUCTURE:
 - Order Book Imbalance: {microstructure.order_book_imbalance if microstructure else 0:+.3f}
 - CVD Side: {microstructure.cvd_side if microstructure else 'BALANCED'}
+- Spread: {microstructure.spread_bps if microstructure else 0:.1f} bps
 
-NEWS & CATALYSTS:
-- Sentiment: {sentiment.overall_sentiment_label if sentiment else 'NEUTRAL'} ({sentiment.overall_sentiment_score if sentiment else 0:+.2f})
-- Narrative: {sentiment.dominant_narrative if sentiment else 'Normal market'}
-- Top Catalysts: {', '.join(sentiment.top_catalysts) if sentiment else 'None'}
+TECHNICAL INDICATORS:
+- RSI: {indicators.rsi if indicators and indicators.rsi is not None else 50:.1f}
+- MACD Hist: {indicators.macd_hist if indicators and indicators.macd_hist is not None else 0:.2f}
+- VWAP: ${indicators.vwap if indicators and indicators.vwap else current_price:,.2f}
+
+CATALYSTS & MACRO CONTEXT:
+- News Sentiment: {sentiment.overall_sentiment_label if sentiment else 'NEUTRAL'} ({sentiment.overall_sentiment_score if sentiment else 0:+.2f})
+- Catalysts: {', '.join(sentiment.top_catalysts) if sentiment else 'None'}
+- Monthly Trend: {monthly_context.monthly_trend if monthly_context else 'RANGE_BOUND'}
+- 30D Range: ${monthly_context.monthly_low if monthly_context else 0:,.2f} - ${monthly_context.monthly_high if monthly_context else 0:,.2f}
 
 TASK:
-1. Provide a realistic 7-day target price (USD number) and 30-day target price (USD number).
-2. Choose forecast bias from ['BULLISH_EXPANSION', 'BEARISH_REVERSAL', 'RANGE_CONSOLIDATION'].
-3. Assign confidence score (integer 50 to 95).
-4. Provide a concise 2-sentence rationale synthesizing quantitative momentum, order book walls, and news catalysts.
+Provide realistic targets for 1m, 5m, 10m, 30m, 1h, 4h, 1d, 7d, and 30d, plus overall forecast bias and 2-sentence rationale.
 """
         schema = {
             "type": "OBJECT",
             "properties": {
+                "target_1m": {"type": "NUMBER"},
+                "target_5m": {"type": "NUMBER"},
+                "target_10m": {"type": "NUMBER"},
+                "target_30m": {"type": "NUMBER"},
+                "target_1h": {"type": "NUMBER"},
+                "target_4h": {"type": "NUMBER"},
+                "target_1d": {"type": "NUMBER"},
                 "target_7d": {"type": "NUMBER"},
                 "target_30d": {"type": "NUMBER"},
                 "forecast_bias": {
