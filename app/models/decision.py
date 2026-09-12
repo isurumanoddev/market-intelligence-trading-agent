@@ -60,6 +60,30 @@ class MonthlyContext(BaseModel):
     volume_trend: str = "NORMAL"        # EXPANDING, CONTRACTING, NORMAL
     macro_bias: str = "NEUTRAL"
 
+class ForecastPoint(BaseModel):
+    day: int
+    date_str: str
+    predicted_price: float
+    upper_bound: float
+    lower_bound: float
+
+class PriceForecastResult(BaseModel):
+    symbol: str
+    current_price: float
+    horizon_days: int = 30
+    target_7d: float
+    target_30d: float
+    expected_return_7d_pct: float
+    expected_return_30d_pct: float
+    projected_range_min: float
+    projected_range_max: float
+    forecast_bias: str = "RANGE_CONSOLIDATION"  # BULLISH_EXPANSION, BEARISH_REVERSAL, RANGE_CONSOLIDATION
+    confidence_score: int = 75  # 0 to 100%
+    model_architecture: str = "Hybrid Deep Learning LSTM + Google Gemini Cognitive Synthesis"
+    trajectory: List[ForecastPoint] = []
+    rationale: str = ""
+    timestamp: str = ""
+
 class TradingDecision(BaseModel):
     symbol: str
     action: str  # STRONG_BUY, BUY, HOLD, SELL, STRONG_SELL
@@ -79,6 +103,7 @@ class TradingDecision(BaseModel):
     macro_view: str = ""
     risk_view: str = ""
     monthly_context: Optional[MonthlyContext] = None
+    price_forecast: Optional[PriceForecastResult] = None
     model_used: str = "Deterministic Confluence Engine"
     timestamp: str
 
