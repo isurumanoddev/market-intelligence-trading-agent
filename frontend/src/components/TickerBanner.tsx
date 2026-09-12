@@ -1,18 +1,22 @@
 "use client";
 
 import React from "react";
-import { Ticker, MicrostructureMetrics, MonthlyContext } from "@/types/market";
+import { Ticker, MicrostructureMetrics, MonthlyContext, DerivativesData, OnChainData } from "@/types/market";
 
 interface TickerBannerProps {
   ticker: Ticker | null;
   microstructure: MicrostructureMetrics | null;
   monthlyContext?: MonthlyContext | null;
+  derivatives?: DerivativesData | null;
+  onchain?: OnChainData | null;
 }
 
 export const TickerBanner: React.FC<TickerBannerProps> = ({
   ticker,
   microstructure,
   monthlyContext,
+  derivatives,
+  onchain,
 }) => {
   if (!ticker || !microstructure) {
     return (
@@ -129,6 +133,70 @@ export const TickerBanner: React.FC<TickerBannerProps> = ({
           {microstructure.cvd.toFixed(2)} ({microstructure.cvd_side})
         </span>
       </div>
+
+      {derivatives && (
+        <>
+          <div className="w-[1px] h-7 bg-slate-800 shrink-0" />
+          <div className="flex flex-col min-w-[160px] font-mono">
+            <div className="flex justify-between items-center text-[10px]">
+              <span className="text-slate-500 uppercase tracking-wider">Funding Rate</span>
+              <span className={`px-1 py-0.2 rounded text-[9px] font-bold ${
+                derivatives.funding_bias === "LONG_CROWDED"
+                  ? "bg-rose-500/20 text-rose-400"
+                  : derivatives.funding_bias === "SHORT_CROWDED"
+                  ? "bg-emerald-500/20 text-emerald-400"
+                  : "bg-slate-800 text-slate-400"
+              }`}>
+                {derivatives.funding_bias.replace("_", " ")}
+              </span>
+            </div>
+            <div className="flex items-baseline gap-2">
+              <span className={`font-bold ${
+                derivatives.funding_rate >= 0 ? "text-emerald-400" : "text-rose-400"
+              }`}>
+                {derivatives.funding_rate >= 0 ? "+" : ""}{derivatives.funding_rate_pct.toFixed(4)}%
+              </span>
+              <span className="text-[10px] text-slate-500">Ann: {derivatives.funding_rate_annualized_pct.toFixed(1)}%</span>
+            </div>
+          </div>
+
+          <div className="w-[1px] h-7 bg-slate-800 shrink-0" />
+
+          <div className="flex flex-col min-w-[120px] font-mono">
+            <span className="text-[10px] text-slate-500 uppercase tracking-wider">Open Interest</span>
+            <span className="text-white font-bold">${formatCompact(derivatives.open_interest_usd)}</span>
+          </div>
+        </>
+      )}
+
+      {onchain && (
+        <>
+          <div className="w-[1px] h-7 bg-slate-800 shrink-0" />
+          <div className="flex flex-col min-w-[180px] font-mono">
+            <div className="flex justify-between items-center text-[10px]">
+              <span className="text-slate-500 uppercase tracking-wider">Stablecoin Flow (30D)</span>
+              <span className={`px-1 py-0.2 rounded text-[9px] font-bold ${
+                onchain.stablecoin_flow_signal.includes("INFLOW")
+                  ? "bg-emerald-500/20 text-emerald-400"
+                  : onchain.stablecoin_flow_signal.includes("OUTFLOW")
+                  ? "bg-rose-500/20 text-rose-400"
+                  : "bg-slate-800 text-slate-400"
+              }`}>
+                {onchain.stablecoin_flow_signal.replace(/_/g, " ")}
+              </span>
+            </div>
+            <div className="flex items-baseline gap-2">
+              <span className={`font-bold ${
+                onchain.stablecoin_30d_change_usd >= 0 ? "text-emerald-400" : "text-rose-400"
+              }`}>
+                {onchain.stablecoin_30d_change_usd >= 0 ? "+" : ""}
+                ${formatCompact(Math.abs(onchain.stablecoin_30d_change_usd))}
+              </span>
+              <span className="text-[10px] text-slate-500">TVL: ${formatCompact(onchain.total_defi_tvl_usd)}</span>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Spread */}
       <div className="flex flex-col min-w-[120px] font-mono">

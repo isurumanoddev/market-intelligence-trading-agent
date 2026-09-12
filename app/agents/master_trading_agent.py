@@ -25,7 +25,10 @@ class MasterTradingAgent:
         sentiment: SentimentMetrics,
         news_items: List[NewsItem],
         monthly_context: Optional[MonthlyContext] = None,
-        price_forecast: Optional[PriceForecastResult] = None
+        price_forecast: Optional[PriceForecastResult] = None,
+        derivatives: Optional[Any] = None,
+        onchain: Optional[Any] = None,
+        coinglass: Optional[Any] = None
     ) -> TradingDecision:
         current_price = ticker.price
         now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -42,7 +45,11 @@ class MasterTradingAgent:
         # 4. Macro Specialist view (Last Month Context)
         macro_view = self._generate_macro_view(ticker, monthly_context)
 
-        # 5. Check if Gemini is enabled for advanced cognitive arbitration
+        # 5. Derivatives & On-Chain Specialists views
+        derivatives_view = self._generate_derivatives_view(derivatives, coinglass)
+        onchain_view = self._generate_onchain_view(onchain)
+
+        # 6. Check if Gemini is enabled for advanced cognitive arbitration
         api_key = settings.gemini_api_key or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
 
         if api_key:
@@ -57,6 +64,8 @@ class MasterTradingAgent:
                     tech_view=tech_view,
                     news_view=news_view,
                     macro_view=macro_view,
+                    derivatives_view=derivatives_view,
+                    onchain_view=onchain_view,
                     monthly_context=monthly_context,
                     price_forecast=price_forecast,
                     api_key=api_key
@@ -76,6 +85,9 @@ class MasterTradingAgent:
             tech_view=tech_view,
             news_view=news_view,
             macro_view=macro_view,
+            derivatives=derivatives,
+            onchain=onchain,
+            coinglass=coinglass,
             monthly_context=monthly_context,
             price_forecast=price_forecast
         )
@@ -120,6 +132,35 @@ class MasterTradingAgent:
 
         return " ".join(parts)
 
+    def _generate_derivatives_view(self, derivatives: Optional[Any], coinglass: Optional[Any]) -> str:
+        parts = []
+        if derivatives:
+            fr = getattr(derivatives, "funding_rate_pct", 0.0)
+            bias = getattr(derivatives, "funding_bias", "NEUTRAL")
+            lev = getattr(derivatives, "leverage_signal", "NORMAL")
+            oi = getattr(derivatives, "open_interest_usd", 0.0)
+            parts.append(f"Perpetual funding rate is {fr:+.4f}% ({bias.replace('_', ' ')}), leverage status: {lev.replace('_', ' ')}.")
+            if oi > 0:
+                parts.append(f"Futures open interest: ${oi:,.0f}.")
+        if coinglass:
+            tot_liq = getattr(coinglass, "total_liquidations_24h_usd", 0.0)
+            liq_dom = getattr(coinglass, "liquidation_dominance", "BALANCED")
+            if tot_liq > 0:
+                parts.append(f"CoinGlass 24h liquidations: ${tot_liq:,.0f} ({liq_dom.replace('_', ' ')}).")
+        return " ".join(parts) if parts else "Derivatives leverage & funding rates are within balanced historical boundaries."
+
+    def _generate_onchain_view(self, onchain: Optional[Any]) -> str:
+        if not onchain:
+            return "On-chain stablecoin and TVL liquidity conditions are stable."
+        flow = getattr(onchain, "stablecoin_flow_signal", "NEUTRAL")
+        change_pct = getattr(onchain, "stablecoin_30d_change_pct", 0.0)
+        tvl = getattr(onchain, "total_defi_tvl_usd", 0.0)
+        tvl_sig = getattr(onchain, "tvl_signal", "STABLE")
+        return (
+            f"DefiLlama on-chain stablecoin supply signal: {flow.replace('_', ' ')} ({change_pct:+.2f}% 30D change). "
+            f"Total DeFi TVL: ${tvl:,.0f} ({tvl_sig.lower()})."
+        )
+
     def _evaluate_deterministic(
         self,
         symbol: str,
@@ -131,6 +172,9 @@ class MasterTradingAgent:
         tech_view: str,
         news_view: str,
         macro_view: str = "",
+        derivatives: Optional[Any] = None,
+        onchain: Optional[Any] = None,
+        coinglass: Optional[Any] = None,
         monthly_context: Optional[MonthlyContext] = None,
         price_forecast: Optional[PriceForecastResult] = None
     ) -> TradingDecision:
@@ -216,8 +260,30 @@ class MasterTradingAgent:
                 forecast_score -= 8
                 reasons.append(f"AI Forecaster models {price_forecast.expected_return_30d_pct:+.1f}% 30d retracement to ${price_forecast.target_30d:,.2f}.")
 
+        # Factor F: Derivatives & On-Chain Liquidity Confluence (Weight: 15)
+        derivatives_score = 0.0
+        if derivatives:
+            bias = getattr(derivatives, "funding_bias", "NEUTRAL")
+            lev = getattr(derivatives, "leverage_signal", "NORMAL")
+            if bias == "SHORT_CROWDED" or lev == "OVERLEVERAGED_SHORT":
+                derivatives_score += 6
+                reasons.append("Short-crowded derivatives positioning creates short squeeze potential.")
+            elif bias == "LONG_CROWDED" or lev == "OVERLEVERAGED_LONG":
+                derivatives_score -= 6
+                reasons.append("High positive funding rate indicates crowded longs vulnerable to flush.")
+
+        if onchain:
+            flow_sig = getattr(onchain, "stablecoin_flow_signal", "NEUTRAL")
+            st_change = getattr(onchain, "stablecoin_30d_change_pct", 0.0)
+            if flow_sig in ["STRONG_INFLOW", "INFLOW"]:
+                derivatives_score += 5
+                reasons.append(f"DefiLlama reports net positive stablecoin expansion ({st_change:+.1f}% 30D).")
+            elif flow_sig in ["STRONG_OUTFLOW", "OUTFLOW"]:
+                derivatives_score -= 5
+                reasons.append(f"DefiLlama reports net stablecoin outflow ({st_change:+.1f}% 30D).")
+
         # Composite score
-        total_score = tech_score + micro_score + news_score + macro_score + forecast_score
+        total_score = tech_score + micro_score + news_score + macro_score + forecast_score + derivatives_score
 
         # Action mapping
         if total_score >= 40:
@@ -284,9 +350,11 @@ class MasterTradingAgent:
         tech_view: str,
         news_view: str,
         macro_view: str,
-        monthly_context: Optional[MonthlyContext],
-        price_forecast: Optional[PriceForecastResult],
-        api_key: str
+        derivatives_view: str = "",
+        onchain_view: str = "",
+        monthly_context: Optional[MonthlyContext] = None,
+        price_forecast: Optional[PriceForecastResult] = None,
+        api_key: str = ""
     ) -> TradingDecision:
         from google import genai
         from google.genai import types
@@ -346,12 +414,16 @@ Synthesize the complete multi-source market intelligence for '{symbol}' and form
 - Dominant Narrative: {sentiment.dominant_narrative}
 - Top Catalysts: {', '.join(sentiment.top_catalysts)}
 {forecast_info}
+7. DERIVATIVES & DEFILLAMA ON-CHAIN LIQUIDITY:
+- Derivatives & Leverage: {derivatives_view}
+- On-Chain Stablecoin Flows: {onchain_view}
+
 TASK:
 Determine:
 1. Action: Exactly one of ['STRONG_BUY', 'BUY', 'HOLD', 'SELL', 'STRONG_SELL']
 2. Conviction percentage (integer 0 to 100)
-3. Clear executive summary (2-3 sentences synthesizing 30-day macro, current microstructure, and news)
-4. List of 3 to 6 key confluence reasons (mentioning 30-day levels, order book flow, and news)
+3. Clear executive summary (2-3 sentences synthesizing 30-day macro, current microstructure, derivatives leverage, and news)
+4. List of 3 to 6 key confluence reasons (mentioning 30-day levels, order book flow, derivatives, and news)
 """
 
         schema = {

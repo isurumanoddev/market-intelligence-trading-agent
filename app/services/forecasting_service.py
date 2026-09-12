@@ -25,6 +25,8 @@ class ForecastingService:
         microstructure: Optional[MicrostructureMetrics] = None,
         sentiment: Optional[SentimentMetrics] = None,
         monthly_context: Optional[MonthlyContext] = None,
+        derivatives: Optional[Any] = None,
+        onchain: Optional[Any] = None,
         horizon_days: int = 30
     ) -> PriceForecastResult:
         """
@@ -109,6 +111,8 @@ class ForecastingService:
             microstructure=microstructure,
             sentiment=sentiment,
             monthly_context=monthly_context,
+            derivatives=derivatives,
+            onchain=onchain,
             gemini_horizon_data=gemini_horizon_data
         )
 
@@ -197,6 +201,8 @@ class ForecastingService:
         microstructure: Optional[MicrostructureMetrics],
         sentiment: Optional[SentimentMetrics],
         monthly_context: Optional[MonthlyContext],
+        derivatives: Optional[Any] = None,
+        onchain: Optional[Any] = None,
         gemini_horizon_data: Optional[Dict[str, Any]] = None
     ) -> List[HorizonPrediction]:
         now = datetime.now()
@@ -219,6 +225,16 @@ class ForecastingService:
         sent_score = sentiment.overall_sentiment_score if sentiment else 0.0
         macro_dir = 1.0 if (monthly_context and monthly_context.monthly_trend == "MACRO_BULLISH") else (-1.0 if (monthly_context and monthly_context.monthly_trend == "MACRO_BEARISH") else 0.0)
 
+        # Derivatives features (Funding rate drag and open interest momentum)
+        funding_rate = getattr(derivatives, "funding_rate", 0.0) if derivatives else 0.0
+        funding_bias = getattr(derivatives, "funding_bias", "NEUTRAL") if derivatives else "NEUTRAL"
+        funding_drag = -max(-0.003, min(0.003, funding_rate * 2.0))
+
+        # On-Chain features (DefiLlama stablecoin supply flows and TVL signals)
+        stablecoin_flow = getattr(onchain, "stablecoin_flow_signal", "NEUTRAL") if onchain else "NEUTRAL"
+        stablecoin_30d_pct = getattr(onchain, "stablecoin_30d_change_pct", 0.0) if onchain else 0.0
+        macro_liquidity_drift = max(-0.015, min(0.015, (stablecoin_30d_pct / 100.0) * 0.15))
+
         # Specifications for 9 horizons
         specs = [
             {
@@ -228,8 +244,8 @@ class ForecastingService:
                 "time_fmt": "%H:%M:%S",
                 "dt_days": 1.0 / 1440.0,
                 "vol_scale": 1.25,
-                "calc_drift": (obi * 0.0006) + (cvd_dir * 0.0003),
-                "driver": f"L2 Order Book Imbalance ({obi:+.2f}) & {cvd_side} Taker Flow" if abs(obi) > 0.05 else "Micro-Tick Liquidity & Spread Dynamics",
+                "calc_drift": (obi * 0.0006) + (cvd_dir * 0.0003) + (funding_drag * 0.2),
+                "driver": f"Funding Drag ({funding_bias}) & {cvd_side} Flow" if funding_bias != "NEUTRAL" else (f"L2 Order Book Imbalance ({obi:+.2f}) & {cvd_side} Taker Flow" if abs(obi) > 0.05 else "Micro-Tick Liquidity & Spread Dynamics"),
                 "base_conf": int(78 + min(abs(obi) * 15, 12)),
                 "gemini_key": "target_1m"
             },
@@ -240,7 +256,7 @@ class ForecastingService:
                 "time_fmt": "%H:%M",
                 "dt_days": 5.0 / 1440.0,
                 "vol_scale": 1.30,
-                "calc_drift": (obi * 0.0010) + (wall_skew * 0.0005) + (cvd_dir * 0.0004),
+                "calc_drift": (obi * 0.0010) + (wall_skew * 0.0005) + (cvd_dir * 0.0004) + (funding_drag * 0.4),
                 "driver": "Order Book Wall Absorption & Depth Skew" if wall_skew != 0 else "High-Frequency Flow Persistence",
                 "base_conf": 77,
                 "gemini_key": "target_5m"
@@ -252,7 +268,7 @@ class ForecastingService:
                 "time_fmt": "%H:%M",
                 "dt_days": 10.0 / 1440.0,
                 "vol_scale": 1.35,
-                "calc_drift": (obi * 0.0012) + (vwap_diff_pct * 0.10) + (cvd_dir * 0.0005),
+                "calc_drift": (obi * 0.0012) + (vwap_diff_pct * 0.10) + (cvd_dir * 0.0005) + (funding_drag * 0.6),
                 "driver": "Micro-VWAP Rebalancing & Flow Velocity",
                 "base_conf": 76,
                 "gemini_key": "target_10m"
@@ -264,7 +280,7 @@ class ForecastingService:
                 "time_fmt": "%H:%M",
                 "dt_days": 30.0 / 1440.0,
                 "vol_scale": 1.40,
-                "calc_drift": (vwap_diff_pct * 0.18) + (rsi_signal * 0.0018) + (obi * 0.0008) + (sent_score * 0.0012),
+                "calc_drift": (vwap_diff_pct * 0.18) + (rsi_signal * 0.0018) + (obi * 0.0008) + (sent_score * 0.0012) + (funding_drag * 0.8),
                 "driver": "Intraday VWAP Pull & RSI Equilibrium",
                 "base_conf": 75,
                 "gemini_key": "target_30m"
@@ -312,8 +328,8 @@ class ForecastingService:
                 "time_fmt": "%b %d",
                 "dt_days": 7.0,
                 "vol_scale": 1.55,
-                "calc_drift": ((target_7d - current_price) / current_price) if current_price > 0 else 0.0,
-                "driver": "7-Day Sequence Drift & Key Levels",
+                "calc_drift": (((target_7d - current_price) / current_price) if current_price > 0 else 0.0) + (macro_liquidity_drift * 0.5),
+                "driver": f"7-Day Sequence Drift & Stablecoin {stablecoin_flow.replace('_', ' ')}" if stablecoin_flow != "NEUTRAL" else "7-Day Sequence Drift & Key Levels",
                 "base_conf": 80,
                 "gemini_key": "target_7d"
             },
@@ -324,8 +340,8 @@ class ForecastingService:
                 "time_fmt": "%b %d",
                 "dt_days": 30.0,
                 "vol_scale": 1.60,
-                "calc_drift": ((target_30d - current_price) / current_price) if current_price > 0 else 0.0,
-                "driver": "30-Day Macro Cycle & Cognitive Synthesis",
+                "calc_drift": (((target_30d - current_price) / current_price) if current_price > 0 else 0.0) + macro_liquidity_drift,
+                "driver": f"Macro Cycle & Stablecoin Supply {stablecoin_flow.replace('_', ' ')}" if stablecoin_flow != "NEUTRAL" else "30-Day Macro Cycle & Cognitive Synthesis",
                 "base_conf": 75,
                 "gemini_key": "target_30d"
             }

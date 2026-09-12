@@ -243,6 +243,49 @@ export interface PortfolioState {
   trades_history: PaperTradeRecord[];
 }
 
+export interface DerivativesData {
+  symbol: string;
+  funding_rate: number;
+  funding_rate_pct: number;
+  funding_rate_annualized_pct: number;
+  next_funding_time: string;
+  funding_bias: "LONG_CROWDED" | "SHORT_CROWDED" | "NEUTRAL";
+  open_interest_usd: number;
+  open_interest_change_pct: number;
+  leverage_signal: "OVERLEVERAGED_LONG" | "OVERLEVERAGED_SHORT" | "NORMAL";
+  long_short_ratio: number;
+  data_source: string;
+  timestamp: string;
+}
+
+export interface OnChainData {
+  total_stablecoin_mcap_usd: number;
+  stablecoin_dominance_pct: number;
+  stablecoin_30d_change_usd: number;
+  stablecoin_30d_change_pct: number;
+  stablecoin_flow_signal: "STRONG_INFLOW" | "INFLOW" | "NEUTRAL" | "OUTFLOW" | "STRONG_OUTFLOW";
+  total_defi_tvl_usd: number;
+  tvl_24h_change_pct: number;
+  tvl_signal: "EXPANDING" | "STABLE" | "CONTRACTING";
+  ethereum_tvl_usd: number;
+  solana_tvl_usd: number;
+  data_source: string;
+  timestamp: string;
+}
+
+export interface CoinGlassData {
+  symbol: string;
+  long_liquidations_24h_usd: number;
+  short_liquidations_24h_usd: number;
+  total_liquidations_24h_usd: number;
+  liquidation_dominance: "LONG_FLUSH" | "SHORT_SQUEEZE" | "BALANCED";
+  aggregated_oi_usd: number;
+  aggregated_oi_change_4h_pct: number;
+  top_trader_long_short_ratio: number;
+  data_source: string;
+  timestamp: string;
+}
+
 export interface FullAnalysisData {
   symbol: string;
   ticker: Ticker;
@@ -251,6 +294,9 @@ export interface FullAnalysisData {
   indicators: TechnicalIndicators;
   microstructure: MicrostructureMetrics;
   monthly_context?: MonthlyContext | null;
+  derivatives?: DerivativesData | null;
+  onchain?: OnChainData | null;
+  coinglass?: CoinGlassData | null;
   price_forecast?: PriceForecastResult | null;
   sentiment: SentimentMetrics;
   news: NewsItem[];
@@ -260,6 +306,8 @@ export interface FullAnalysisData {
 export interface SettingsData {
   has_gemini_key: boolean;
   gemini_key_masked: string;
+  has_coinglass_key?: boolean;
+  coinglass_key_masked?: string;
   default_exchange: string;
   default_symbols: string[];
   max_risk_per_trade_pct: number;

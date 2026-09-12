@@ -174,6 +174,8 @@ export default function DashboardPage() {
         ticker={analysis?.ticker || null}
         microstructure={analysis?.microstructure || null}
         monthlyContext={analysis?.monthly_context || null}
+        derivatives={analysis?.derivatives || null}
+        onchain={analysis?.onchain || null}
       />
 
       {/* Error Alert */}

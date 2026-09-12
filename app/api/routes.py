@@ -10,6 +10,9 @@ from app.services.paper_broker import paper_broker
 from app.services.forecasting_service import forecasting_service
 from app.agents.sentiment_agent import sentiment_agent
 from app.agents.master_trading_agent import master_trading_agent
+from app.services.derivatives_service import derivatives_service
+from app.services.onchain_service import onchain_service
+from app.services.coinglass_service import coinglass_service
 
 router = APIRouter()
 
@@ -29,6 +32,7 @@ class ClosePositionRequest(BaseModel):
 
 class SettingsUpdateRequest(BaseModel):
     gemini_api_key: Optional[str] = None
+    coinglass_api_key: Optional[str] = None
     default_exchange: Optional[str] = None
     max_risk_per_trade_pct: Optional[float] = None
     max_spread_pct: Optional[float] = None
@@ -110,6 +114,34 @@ async def get_price_forecast(
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+@router.get("/market/derivatives")
+async def get_derivatives(symbol: str = Query(default="BTC/USDT")):
+    try:
+        return derivatives_service.get_derivatives_data(symbol)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.get("/market/onchain")
+async def get_onchain():
+    try:
+        return onchain_service.get_onchain_data()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.get("/market/coinglass")
+async def get_coinglass(symbol: str = Query(default="BTC")):
+    try:
+        if not coinglass_service.is_available():
+            raise HTTPException(status_code=404, detail="CoinGlass API key not configured")
+        data = coinglass_service.get_coinglass_data(symbol)
+        if not data:
+            raise HTTPException(status_code=404, detail="Data not found or error")
+        return data
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 @router.get("/analysis")
 async def get_full_analysis(symbol: str = Query(default="BTC/USDT")):
     """
@@ -133,6 +165,26 @@ async def get_full_analysis(symbol: str = Query(default="BTC/USDT")):
         raw_news = news_service.get_news_for_symbol(symbol, limit=25)
         sentiment_metrics, scored_news = sentiment_agent.analyze(symbol, raw_news)
         
+        # Ingest Real-Time Derivatives, DefiLlama On-Chain Liquidity, and CoinGlass Data
+        derivatives_data = None
+        try:
+            derivatives_data = derivatives_service.get_derivatives_data(symbol)
+        except Exception:
+            pass
+
+        onchain_data = None
+        try:
+            onchain_data = onchain_service.get_onchain_data()
+        except Exception:
+            pass
+
+        coinglass_data = None
+        try:
+            base_sym = symbol.split('/')[0]
+            coinglass_data = coinglass_service.get_coinglass_data(base_sym)
+        except Exception:
+            pass
+
         # Generate State-of-the-Art Hybrid Neural-Cognitive 30-day price forecast
         forecast = forecasting_service.generate_forecast(
             symbol=symbol,
@@ -142,6 +194,8 @@ async def get_full_analysis(symbol: str = Query(default="BTC/USDT")):
             microstructure=microstructure,
             sentiment=sentiment_metrics,
             monthly_context=monthly_context,
+            derivatives=derivatives_data,
+            onchain=onchain_data,
             horizon_days=30
         )
 
@@ -153,7 +207,10 @@ async def get_full_analysis(symbol: str = Query(default="BTC/USDT")):
             sentiment=sentiment_metrics,
             news_items=scored_news,
             monthly_context=monthly_context,
-            price_forecast=forecast
+            price_forecast=forecast,
+            derivatives=derivatives_data,
+            onchain=onchain_data,
+            coinglass=coinglass_data
         )
 
         return {
@@ -164,6 +221,9 @@ async def get_full_analysis(symbol: str = Query(default="BTC/USDT")):
             "indicators": indicators,
             "microstructure": microstructure,
             "monthly_context": monthly_context,
+            "derivatives": derivatives_data,
+            "onchain": onchain_data,
+            "coinglass": coinglass_data,
             "price_forecast": forecast,
             "sentiment": sentiment_metrics,
             "news": scored_news[:15],
@@ -222,6 +282,8 @@ async def get_settings():
     return {
         "has_gemini_key": bool(settings.gemini_api_key),
         "gemini_key_masked": f"{settings.gemini_api_key[:4]}...{settings.gemini_api_key[-4:]}" if len(settings.gemini_api_key) > 8 else ("Configured" if settings.gemini_api_key else "Not configured"),
+        "has_coinglass_key": bool(settings.coinglass_api_key),
+        "coinglass_key_masked": f"{settings.coinglass_api_key[:4]}...{settings.coinglass_api_key[-4:]}" if len(settings.coinglass_api_key) > 8 else ("Configured" if settings.coinglass_api_key else "Not configured"),
         "default_exchange": settings.default_exchange,
         "default_symbols": settings.default_symbols,
         "max_risk_per_trade_pct": settings.max_risk_per_trade_pct,
@@ -232,6 +294,8 @@ async def get_settings():
 async def update_settings(req: SettingsUpdateRequest):
     if req.gemini_api_key is not None:
         settings.gemini_api_key = req.gemini_api_key.strip()
+    if req.coinglass_api_key is not None:
+        settings.coinglass_api_key = req.coinglass_api_key.strip()
     if req.default_exchange is not None:
         settings.default_exchange = req.default_exchange.strip().lower()
     if req.max_risk_per_trade_pct is not None:

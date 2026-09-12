@@ -8,6 +8,7 @@ load_dotenv()
 class Settings(BaseModel):
     # API Keys
     gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")
+    coinglass_api_key: str = os.getenv("COINGLASS_API_KEY", "")
     
     # Default settings
     default_exchange: str = os.getenv("DEFAULT_EXCHANGE", "kraken")
