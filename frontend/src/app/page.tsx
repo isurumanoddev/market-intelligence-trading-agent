@@ -173,6 +173,7 @@ export default function DashboardPage() {
       <TickerBanner
         ticker={analysis?.ticker || null}
         microstructure={analysis?.microstructure || null}
+        monthlyContext={analysis?.monthly_context || null}
       />
 
       {/* Error Alert */}

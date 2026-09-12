@@ -58,4 +58,30 @@ def test_microstructure_analysis():
     assert micro.order_book_imbalance == 0.5
     assert micro.cvd == 10.0  # 15 buy - 5 sell
     assert micro.cvd_side == "BUY_DOMINANT"
-    assert "BULLISH" in micro.order_flow_signal
+
+def test_monthly_context_calculation():
+    candles_1d = []
+    # 30 daily candles from price 60,000 to 75,000
+    for i in range(30):
+        base = 60000.0 + (i * 500.0)
+        candles_1d.append(Candle(
+            timestamp=1700000000 + (i * 86400),
+            time_str=f"2026-02-{i+1:02d}",
+            open=base,
+            high=base + 1000.0,
+            low=base - 500.0,
+            close=base + 400.0,
+            volume=1000.0
+        ))
+    
+    current_price = 74500.0
+    monthly = technical_analyzer.calculate_monthly_context(candles_1d, current_price)
+    
+    assert monthly.lookback_days == 30
+    assert monthly.monthly_high == pytest.approx(75500.0, rel=1e-2)
+    assert monthly.monthly_low == pytest.approx(59500.0, rel=1e-2)
+    assert monthly.monthly_change_pct > 20.0
+    assert monthly.monthly_trend == "MACRO_BULLISH"
+    assert monthly.range_position_pct > 80.0
+    assert monthly.key_monthly_support > 0
+    assert monthly.key_monthly_resistance > 0

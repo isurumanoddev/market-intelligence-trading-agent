@@ -119,6 +119,26 @@ export interface SentimentMetrics {
   dominant_narrative: string;
 }
 
+export interface MonthlyContext {
+  lookback_days: number;
+  monthly_high: number;
+  monthly_low: number;
+  monthly_open: number;
+  monthly_close: number;
+  monthly_change_pct: number;
+  monthly_trend: "MACRO_BULLISH" | "MACRO_BEARISH" | "RANGE_BOUND";
+  monthly_range_pct: number;
+  range_position_pct: number;
+  key_monthly_support: number;
+  key_monthly_resistance: number;
+  sma_30d: number;
+  distance_from_sma_pct: number;
+  volume_30d_total: number;
+  volume_avg_daily: number;
+  volume_trend: "EXPANDING" | "CONTRACTING" | "NORMAL";
+  macro_bias: "BULLISH" | "BEARISH" | "NEUTRAL";
+}
+
 export interface TradingDecision {
   symbol: string;
   action: "STRONG_BUY" | "BUY" | "HOLD" | "SELL" | "STRONG_SELL";
@@ -135,7 +155,9 @@ export interface TradingDecision {
   microstructure_view: string;
   technical_view: string;
   news_view: string;
+  macro_view?: string;
   risk_view: string;
+  monthly_context?: MonthlyContext | null;
   model_used: string;
   timestamp: string;
 }
@@ -187,6 +209,7 @@ export interface FullAnalysisData {
   trades: Trade[];
   indicators: TechnicalIndicators;
   microstructure: MicrostructureMetrics;
+  monthly_context?: MonthlyContext | null;
   sentiment: SentimentMetrics;
   news: NewsItem[];
   decision: TradingDecision;

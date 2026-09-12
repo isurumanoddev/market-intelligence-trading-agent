@@ -60,12 +60,18 @@ async def get_candles(
     limit: int = Query(default=60, le=200)
 ):
     try:
-        return market_service.get_ohlcv(symbol, timeframe=timeframe, limit=limit)
+        # Map 30D / 1M timeframe to daily candles with 35-candle lookback
+        tf = timeframe
+        lim = limit
+        if timeframe.lower() in ["30d", "1m"]:
+            tf = "1d"
+            lim = max(limit, 35)
+        return market_service.get_ohlcv(symbol, timeframe=tf, limit=lim)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.get("/news")
-async def get_news(symbol: str = Query(default="BTC/USDT"), limit: int = Query(default=10, le=30)):
+async def get_news(symbol: str = Query(default="BTC/USDT"), limit: int = Query(default=25, le=50)):
     try:
         items = news_service.get_news_for_symbol(symbol, limit=limit)
         sentiment_metrics, updated_items = sentiment_agent.analyze(symbol, items)
@@ -80,19 +86,23 @@ async def get_news(symbol: str = Query(default="BTC/USDT"), limit: int = Query(d
 async def get_full_analysis(symbol: str = Query(default="BTC/USDT")):
     """
     Comprehensive pipeline endpoint: Fetches real-time price, order book, trade tape,
-    computes quant indicators and order book imbalance, analyzes news sentiment,
+    30-day historical macro data, computes quant indicators, analyzes news sentiment & catalysts,
     and runs the AI Master Trading Decision Agent.
     """
     try:
         ticker = market_service.get_ticker(symbol)
         order_book = market_service.get_order_book(symbol, limit=25)
         trades = market_service.get_recent_trades(symbol, limit=50)
-        candles = market_service.get_ohlcv(symbol, limit=60)
+        candles = market_service.get_ohlcv(symbol, timeframe="1h", limit=60)
+        
+        # Ingest 30-day daily candles for macro historical context
+        candles_1d = market_service.get_ohlcv(symbol, timeframe="1d", limit=35)
         
         indicators = technical_analyzer.calculate_indicators(candles)
         microstructure = technical_analyzer.analyze_microstructure(order_book, trades)
+        monthly_context = technical_analyzer.calculate_monthly_context(candles_1d, ticker.price)
         
-        raw_news = news_service.get_news_for_symbol(symbol, limit=10)
+        raw_news = news_service.get_news_for_symbol(symbol, limit=25)
         sentiment_metrics, scored_news = sentiment_agent.analyze(symbol, raw_news)
         
         decision = master_trading_agent.evaluate(
@@ -101,7 +111,8 @@ async def get_full_analysis(symbol: str = Query(default="BTC/USDT")):
             indicators=indicators,
             microstructure=microstructure,
             sentiment=sentiment_metrics,
-            news_items=scored_news
+            news_items=scored_news,
+            monthly_context=monthly_context
         )
 
         return {
@@ -111,8 +122,9 @@ async def get_full_analysis(symbol: str = Query(default="BTC/USDT")):
             "trades": trades[:25],
             "indicators": indicators,
             "microstructure": microstructure,
+            "monthly_context": monthly_context,
             "sentiment": sentiment_metrics,
-            "news": scored_news[:8],
+            "news": scored_news[:15],
             "decision": decision
         }
     except Exception as e:

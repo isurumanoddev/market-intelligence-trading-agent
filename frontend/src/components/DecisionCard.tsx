@@ -15,7 +15,7 @@ export const DecisionCard: React.FC<DecisionCardProps> = ({
   onExecuteTrade,
   isExecuting,
 }) => {
-  const [activeTab, setActiveTab] = useState<"confluence" | "micro" | "news" | "risk">("confluence");
+  const [activeTab, setActiveTab] = useState<"confluence" | "macro" | "micro" | "news" | "risk">("confluence");
 
   if (!decision) {
     return (
@@ -41,6 +41,7 @@ export const DecisionCard: React.FC<DecisionCardProps> = ({
       : "bg-slate-700 text-white";
 
   const barColor = isBuy ? "bg-emerald-500" : isSell ? "bg-rose-500" : "bg-blue-500";
+  const monthly = decision.monthly_context;
 
   return (
     <div className="bg-gradient-to-br from-[#141b2a] to-[#0d121c] border border-slate-700/80 rounded-md p-3.5 shadow-xl flex flex-col gap-3">
@@ -133,6 +134,16 @@ export const DecisionCard: React.FC<DecisionCardProps> = ({
             Confluence
           </button>
           <button
+            onClick={() => setActiveTab("macro")}
+            className={`px-2 py-0.5 text-[11px] rounded transition-colors ${
+              activeTab === "macro"
+                ? "bg-[#171f30] text-white font-semibold"
+                : "text-slate-500 hover:text-slate-300"
+            }`}
+          >
+            30D Macro
+          </button>
+          <button
             onClick={() => setActiveTab("micro")}
             className={`px-2 py-0.5 text-[11px] rounded transition-colors ${
               activeTab === "micro"
@@ -150,7 +161,7 @@ export const DecisionCard: React.FC<DecisionCardProps> = ({
                 : "text-slate-500 hover:text-slate-300"
             }`}
           >
-            News & Macro
+            News & Catalysts
           </button>
           <button
             onClick={() => setActiveTab("risk")}
@@ -176,6 +187,33 @@ export const DecisionCard: React.FC<DecisionCardProps> = ({
               ))}
             </ul>
           )}
+
+          {activeTab === "macro" && (
+            <div className="flex flex-col gap-2 font-mono">
+              <p className="font-sans text-slate-300">{decision.macro_view || "30-day macro history is active."}</p>
+              {monthly && (
+                <div className="grid grid-cols-2 gap-1.5 bg-[#0a0e17] p-2 rounded border border-slate-800 text-[10px]">
+                  <div>
+                    <span className="text-slate-500">Key 30D Support: </span>
+                    <span className="text-emerald-400 font-bold">${formatPrice(monthly.key_monthly_support)}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500">Key 30D Resist.: </span>
+                    <span className="text-rose-400 font-bold">${formatPrice(monthly.key_monthly_resistance)}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500">30D SMA: </span>
+                    <span className="text-slate-200 font-bold">${formatPrice(monthly.sma_30d)}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500">Volume Trend: </span>
+                    <span className="text-cyan-400 font-bold">{monthly.volume_trend}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {activeTab === "micro" && <p>{decision.microstructure_view}</p>}
           {activeTab === "news" && <p>{decision.news_view}</p>}
           {activeTab === "risk" && <p>{decision.risk_view}</p>}

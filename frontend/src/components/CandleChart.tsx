@@ -21,7 +21,7 @@ export const CandleChart: React.FC<CandleChartProps> = ({
   const [hoveredCandle, setHoveredCandle] = useState<Candle | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const TIMEFRAMES = ["5m", "15m", "1h", "1d"];
+  const TIMEFRAMES = ["5m", "15m", "1h", "1d", "30D"];
 
   // SVG dimensions
   const width = 480;

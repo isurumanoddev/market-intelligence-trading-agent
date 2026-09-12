@@ -10,16 +10,27 @@ interface NewsFeedProps {
 }
 
 export const NewsFeed: React.FC<NewsFeedProps> = ({ news, sentiment }) => {
+  const [filter, setFilter] = React.useState<"ALL" | "MACRO" | "REGULATORY" | "BULLISH" | "BEARISH">("ALL");
+
   const label = sentiment?.overall_sentiment_label || "NEUTRAL";
   const score = sentiment?.overall_sentiment_score || 0;
+
+  const filteredNews = news.filter((item) => {
+    if (filter === "ALL") return true;
+    if (filter === "MACRO") return item.catalyst_type === "MACRO";
+    if (filter === "REGULATORY") return item.catalyst_type === "REGULATORY";
+    if (filter === "BULLISH") return item.sentiment_label === "BULLISH";
+    if (filter === "BEARISH") return item.sentiment_label === "BEARISH";
+    return true;
+  });
 
   return (
     <div className="bg-[#111622] border border-slate-800 rounded-md p-3.5 flex flex-col flex-1">
       {/* Header */}
-      <div className="flex justify-between items-center mb-2.5">
+      <div className="flex justify-between items-center mb-2">
         <div className="flex items-center gap-2">
           <Newspaper className="w-4 h-4 text-slate-400" />
-          <span className="font-semibold text-xs text-white">Live Market News & Catalysts</span>
+          <span className="font-semibold text-xs text-white">Live News & Macro Intelligence</span>
         </div>
         <span
           className={`text-[10px] px-2 py-0.5 rounded font-bold font-mono ${
@@ -35,14 +46,31 @@ export const NewsFeed: React.FC<NewsFeedProps> = ({ news, sentiment }) => {
         </span>
       </div>
 
+      {/* Filter Tabs */}
+      <div className="flex gap-1 mb-2.5 overflow-x-auto pb-1 text-[10px] font-mono">
+        {(["ALL", "MACRO", "REGULATORY", "BULLISH", "BEARISH"] as const).map((f) => (
+          <button
+            key={f}
+            onClick={() => setFilter(f)}
+            className={`px-2 py-0.5 rounded transition-colors ${
+              filter === f
+                ? "bg-blue-600 text-white font-semibold shadow"
+                : "bg-[#171f30] text-slate-400 hover:text-slate-200"
+            }`}
+          >
+            {f}
+          </button>
+        ))}
+      </div>
+
       {/* News Items Scroll */}
       <div className="space-y-2 overflow-y-auto max-h-[260px] pr-1">
-        {news.length === 0 ? (
+        {filteredNews.length === 0 ? (
           <div className="text-slate-500 text-xs font-mono py-4 text-center">
-            Fetching market news headlines...
+            No news items matching selected filter.
           </div>
         ) : (
-          news.map((item) => (
+          filteredNews.map((item) => (
             <a
               key={item.id}
               href={item.url}
