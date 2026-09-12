@@ -11,6 +11,8 @@ RSS_FEEDS = [
     {"source": "Cointelegraph", "url": "https://cointelegraph.com/rss", "type": "crypto"},
     {"source": "Yahoo Finance", "url": "https://finance.yahoo.com/news/rssindex", "type": "macro"},
     {"source": "Decrypt", "url": "https://decrypt.co/feed", "type": "crypto"},
+    {"source": "Bitcoin Magazine", "url": "https://bitcoinmagazine.com/feed", "type": "crypto"},
+    {"source": "Blockworks", "url": "https://blockworks.co/feed", "type": "macro"},
 ]
 
 class NewsService:
@@ -37,7 +39,7 @@ class NewsService:
         for feed_info in RSS_FEEDS:
             try:
                 parsed = feedparser.parse(feed_info["url"])
-                for entry in parsed.entries[:15]:
+                for entry in parsed.entries[:25]:
                     raw_title = entry.get("title", "")
                     title = self._strip_html(raw_title)
                     if not title or title in seen_titles:
@@ -45,10 +47,25 @@ class NewsService:
                     seen_titles.add(title)
 
                     raw_summary = entry.get("summary") or entry.get("description") or ""
-                    summary = self._strip_html(raw_summary)[:300]
+                    summary = self._strip_html(raw_summary)[:350]
                     url = entry.get("link", "")
                     published = entry.get("published") or entry.get("updated") or "Recently"
                     
+                    # Catalyst classification
+                    combined_text = f"{title} {summary}".lower()
+                    if any(k in combined_text for k in ["fed", "rate cut", "inflation", "cpi", "powell", "treasury", "macro", "yield", "gdp"]):
+                        cat_type = "MACRO"
+                    elif any(k in combined_text for k in ["sec", "lawsuit", "regulation", "bill", "court", "etf approval", "compliance", "gensler"]):
+                        cat_type = "REGULATORY"
+                    elif any(k in combined_text for k in ["hack", "exploit", "stolen", "vulnerability", "drain"]):
+                        cat_type = "SECURITY"
+                    elif any(k in combined_text for k in ["upgrade", "mainnet", "hard fork", "layer 2", "ai model", "chip"]):
+                        cat_type = "TECH"
+                    elif any(k in combined_text for k in ["partnership", "etf", "blackrock", "fidelity", "reserve", "treasury reserve"]):
+                        cat_type = "ADOPTION"
+                    else:
+                        cat_type = "GENERAL"
+
                     item_id = f"news_{int(time.time())}_{len(items)}"
                     items.append(NewsItem(
                         id=item_id,
@@ -59,7 +76,7 @@ class NewsService:
                         published_at=published,
                         sentiment_score=0.0,
                         sentiment_label="NEUTRAL",
-                        catalyst_type="GENERAL",
+                        catalyst_type=cat_type,
                         relevance_score=0.5
                     ))
             except Exception as e:
@@ -71,7 +88,7 @@ class NewsService:
 
         return self._cache
 
-    def get_news_for_symbol(self, symbol: str, limit: int = 15) -> List[NewsItem]:
+    def get_news_for_symbol(self, symbol: str, limit: int = 25) -> List[NewsItem]:
         all_news = self.fetch_all_news()
         clean_sym = symbol.split("/")[0].upper() if "/" in symbol else symbol.upper()
         

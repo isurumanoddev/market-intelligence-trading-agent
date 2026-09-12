@@ -1,5 +1,5 @@
-from typing import Dict, Any, Tuple
-from app.models.decision import TechnicalIndicators, MicrostructureMetrics
+from typing import Dict, Any, Tuple, Optional
+from app.models.decision import TechnicalIndicators, MicrostructureMetrics, MonthlyContext
 from app.config import settings
 
 class RiskAgent:
@@ -9,7 +9,8 @@ class RiskAgent:
         current_price: float,
         indicators: TechnicalIndicators,
         microstructure: MicrostructureMetrics,
-        action_lean: str  # 'BUY', 'SELL', 'HOLD'
+        action_lean: str,  # 'BUY', 'SELL', 'HOLD'
+        monthly_context: Optional[MonthlyContext] = None
     ) -> Dict[str, Any]:
         spread_pct = microstructure.spread_pct
         atr = indicators.atr if indicators.atr and indicators.atr > 0 else (current_price * 0.02)
@@ -21,22 +22,36 @@ class RiskAgent:
 
         # Compute dynamic ATR multiplier based on volatility
         sl_distance = max(atr * 1.5, current_price * 0.015)
-        
-        # Consider nearby support/resistance wall if available
-        if action_lean == "BUY" and microstructure.large_bid_walls:
-            wall_p = microstructure.large_bid_walls[0]["price"]
-            if wall_p < current_price:
-                # Place stop just under the wall
-                wall_sl = wall_p * 0.998
-                if wall_sl < current_price:
-                    sl_distance = max(current_price - wall_sl, current_price * 0.01)
+        pivot_note = ""
 
-        elif action_lean == "SELL" and microstructure.large_ask_walls:
-            wall_p = microstructure.large_ask_walls[0]["price"]
-            if wall_p > current_price:
-                wall_sl = wall_p * 1.002
-                if wall_sl > current_price:
-                    sl_distance = max(wall_sl - current_price, current_price * 0.01)
+        # Consider nearby support/resistance wall if available
+        if action_lean in ["BUY", "STRONG_BUY"]:
+            if monthly_context and monthly_context.key_monthly_support > 0:
+                sup = monthly_context.key_monthly_support
+                if 0 < (current_price - sup) <= (current_price * 0.08):
+                    # Place stop just under 30d monthly support pivot
+                    sl_distance = max(current_price - (sup * 0.995), current_price * 0.012)
+                    pivot_note = f"Stop aligned just beneath 30-day key support pivot (${sup:,.2f})."
+            elif microstructure.large_bid_walls:
+                wall_p = microstructure.large_bid_walls[0]["price"]
+                if wall_p < current_price:
+                    wall_sl = wall_p * 0.998
+                    if wall_sl < current_price:
+                        sl_distance = max(current_price - wall_sl, current_price * 0.01)
+
+        elif action_lean in ["SELL", "STRONG_SELL"]:
+            if monthly_context and monthly_context.key_monthly_resistance > 0:
+                res = monthly_context.key_monthly_resistance
+                if 0 < (res - current_price) <= (current_price * 0.08):
+                    # Place stop just above 30d monthly resistance pivot
+                    sl_distance = max((res * 1.005) - current_price, current_price * 0.012)
+                    pivot_note = f"Stop aligned just above 30-day key resistance pivot (${res:,.2f})."
+            elif microstructure.large_ask_walls:
+                wall_p = microstructure.large_ask_walls[0]["price"]
+                if wall_p > current_price:
+                    wall_sl = wall_p * 1.002
+                    if wall_sl > current_price:
+                        sl_distance = max(wall_sl - current_price, current_price * 0.01)
 
         # Calculate Stops and Targets
         if action_lean in ["STRONG_BUY", "BUY"]:
@@ -69,7 +84,9 @@ class RiskAgent:
         risk_notes = []
         if spread_warning:
             risk_notes.append(spread_warning)
-        risk_notes.append(f"Dynamic stop calibrated to 1.5x ATR (${atr:.2f}), limiting trade downside to {sl_pct*100:.2f}%.")
+        if pivot_note:
+            risk_notes.append(pivot_note)
+        risk_notes.append(f"Dynamic stop calibrated to ATR (${atr:.2f}), limiting trade downside to {sl_pct*100:.2f}%.")
         risk_notes.append(f"Recommended position allocation: {recommended_pos_pct}% of account portfolio.")
 
         return {

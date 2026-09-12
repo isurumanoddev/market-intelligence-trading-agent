@@ -1,7 +1,7 @@
 import numpy as np
 from typing import List, Dict, Any, Optional
 from app.models.market_data import Candle, OrderBook, Trade
-from app.models.decision import TechnicalIndicators, MicrostructureMetrics
+from app.models.decision import TechnicalIndicators, MicrostructureMetrics, MonthlyContext
 
 class TechnicalAnalysisService:
 
@@ -203,6 +203,90 @@ class TechnicalAnalysisService:
             large_bid_walls=large_bids[:3],
             large_ask_walls=large_asks[:3],
             order_flow_signal=order_flow_signal
+        )
+
+    @staticmethod
+    def calculate_monthly_context(candles_1d: List[Candle], current_price: float) -> MonthlyContext:
+        if not candles_1d or len(candles_1d) < 3:
+            return MonthlyContext()
+
+        # Take up to the most recent 30 daily candles
+        lookback = candles_1d[-30:] if len(candles_1d) >= 30 else candles_1d
+        actual_days = len(lookback)
+
+        highs = [c.high for c in lookback]
+        lows = [c.low for c in lookback]
+        closes = [c.close for c in lookback]
+        volumes = [c.volume for c in lookback]
+
+        monthly_high = float(max(highs))
+        monthly_low = float(min(lows))
+        monthly_open = float(lookback[0].open)
+        monthly_close = float(lookback[-1].close)
+
+        # Monthly Change %
+        monthly_change_pct = ((monthly_close - monthly_open) / monthly_open) * 100.0 if monthly_open > 0 else 0.0
+
+        # Price Range and Range Position (0% = at monthly low, 100% = at monthly high)
+        price_range = monthly_high - monthly_low
+        monthly_range_pct = (price_range / monthly_low * 100.0) if monthly_low > 0 else 0.0
+        
+        range_pos = ((current_price - monthly_low) / price_range * 100.0) if price_range > 0 else 50.0
+        range_pos = max(0.0, min(100.0, range_pos))
+
+        # 30-Day SMA
+        sma_30d = float(np.mean(closes))
+        dist_sma_pct = ((current_price - sma_30d) / sma_30d * 100.0) if sma_30d > 0 else 0.0
+
+        # Swing pivots & key monthly support / resistance levels
+        if len(highs) >= 8:
+            key_resistance = float(np.percentile(highs, 85))
+            key_support = float(np.percentile(lows, 15))
+        else:
+            key_resistance = monthly_high
+            key_support = monthly_low
+
+        # Volume metrics
+        total_vol = float(sum(volumes))
+        avg_daily_vol = total_vol / actual_days if actual_days > 0 else 0.0
+        
+        recent_7d_vol = float(np.mean(volumes[-7:])) if len(volumes) >= 7 else avg_daily_vol
+        if recent_7d_vol > avg_daily_vol * 1.25:
+            vol_trend = "EXPANDING"
+        elif recent_7d_vol < avg_daily_vol * 0.75:
+            vol_trend = "CONTRACTING"
+        else:
+            vol_trend = "NORMAL"
+
+        # Macro Trend determination
+        if current_price > sma_30d and monthly_change_pct > 2.5:
+            monthly_trend = "MACRO_BULLISH"
+            macro_bias = "BULLISH"
+        elif current_price < sma_30d and monthly_change_pct < -2.5:
+            monthly_trend = "MACRO_BEARISH"
+            macro_bias = "BEARISH"
+        else:
+            monthly_trend = "RANGE_BOUND"
+            macro_bias = "NEUTRAL"
+
+        return MonthlyContext(
+            lookback_days=actual_days,
+            monthly_high=round(monthly_high, 2),
+            monthly_low=round(monthly_low, 2),
+            monthly_open=round(monthly_open, 2),
+            monthly_close=round(monthly_close, 2),
+            monthly_change_pct=round(monthly_change_pct, 2),
+            monthly_trend=monthly_trend,
+            monthly_range_pct=round(monthly_range_pct, 2),
+            range_position_pct=round(range_pos, 1),
+            key_monthly_support=round(key_support, 2),
+            key_monthly_resistance=round(key_resistance, 2),
+            sma_30d=round(sma_30d, 2),
+            distance_from_sma_pct=round(dist_sma_pct, 2),
+            volume_30d_total=round(total_vol, 2),
+            volume_avg_daily=round(avg_daily_vol, 2),
+            volume_trend=vol_trend,
+            macro_bias=macro_bias
         )
 
 technical_analyzer = TechnicalAnalysisService()

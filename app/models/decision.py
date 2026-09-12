@@ -41,6 +41,25 @@ class SentimentMetrics(BaseModel):
     top_catalysts: List[str] = []
     dominant_narrative: str = "Normal market conditions"
 
+class MonthlyContext(BaseModel):
+    lookback_days: int = 30
+    monthly_high: float = 0.0
+    monthly_low: float = 0.0
+    monthly_open: float = 0.0
+    monthly_close: float = 0.0
+    monthly_change_pct: float = 0.0
+    monthly_trend: str = "RANGE_BOUND"  # MACRO_BULLISH, MACRO_BEARISH, RANGE_BOUND
+    monthly_range_pct: float = 0.0
+    range_position_pct: float = 50.0   # 0% = at 30d low, 100% = at 30d high
+    key_monthly_support: float = 0.0
+    key_monthly_resistance: float = 0.0
+    sma_30d: float = 0.0
+    distance_from_sma_pct: float = 0.0
+    volume_30d_total: float = 0.0
+    volume_avg_daily: float = 0.0
+    volume_trend: str = "NORMAL"        # EXPANDING, CONTRACTING, NORMAL
+    macro_bias: str = "NEUTRAL"
+
 class TradingDecision(BaseModel):
     symbol: str
     action: str  # STRONG_BUY, BUY, HOLD, SELL, STRONG_SELL
@@ -57,7 +76,9 @@ class TradingDecision(BaseModel):
     microstructure_view: str = ""
     technical_view: str = ""
     news_view: str = ""
+    macro_view: str = ""
     risk_view: str = ""
+    monthly_context: Optional[MonthlyContext] = None
     model_used: str = "Deterministic Confluence Engine"
     timestamp: str
 
