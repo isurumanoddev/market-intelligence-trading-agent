@@ -75,6 +75,24 @@ def test_multi_horizon_predictions_complete_spectrum():
         calc_pct = round(((p.predicted_price - current_price) / current_price) * 100.0, 2)
         assert abs(p.expected_change_pct - calc_pct) < 0.05
 
+        # Verify new deep-dive fields
+        assert len(p.reasons) >= 3, f"Expected at least 3 reasons for horizon {p.horizon}"
+        assert "order_book_imbalance" in p.off_chain_data
+        assert "funding_rate_pct" in p.off_chain_data
+        assert "total_stablecoin_mcap_usd" in p.on_chain_data
+        assert "timeframe_trend" in p.chart_analysis
+        assert "key_support" in p.chart_analysis
+        assert "strategy_name" in p.trading_strategy
+        assert len(p.trading_strategy["entry_zone"]) == 2
+        assert p.trading_strategy["stop_loss"] > 0
+        assert p.trading_strategy["take_profit_1"] > 0
+        assert p.trading_strategy["risk_reward_ratio"] > 0
+
     pred_1m = preds[0]
     assert pred_1m.horizon == '1m'
     assert pred_1m.predicted_price >= current_price
+    assert pred_1m.trading_strategy["strategy_type"] == "SCALP"
+
+    pred_30d = preds[-1]
+    assert pred_30d.horizon == '30d'
+    assert pred_30d.trading_strategy["strategy_type"] == "MACRO_POSITION"

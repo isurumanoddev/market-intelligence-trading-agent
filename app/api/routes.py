@@ -102,6 +102,18 @@ async def get_price_forecast(
         trades = market_service.get_recent_trades(symbol, limit=30)
         microstructure = technical_analyzer.analyze_microstructure(order_book, trades)
         
+        derivatives_data = None
+        try:
+            derivatives_data = derivatives_service.get_derivatives_data(symbol)
+        except Exception:
+            pass
+
+        onchain_data = None
+        try:
+            onchain_data = onchain_service.get_onchain_data()
+        except Exception:
+            pass
+
         return forecasting_service.generate_forecast(
             symbol=symbol,
             current_price=ticker.price,
@@ -109,6 +121,8 @@ async def get_price_forecast(
             microstructure=microstructure,
             sentiment=sentiment_metrics,
             monthly_context=monthly_context,
+            derivatives=derivatives_data,
+            onchain=onchain_data,
             horizon_days=horizon
         )
     except Exception as e:

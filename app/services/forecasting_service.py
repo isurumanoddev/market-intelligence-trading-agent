@@ -383,6 +383,156 @@ class ForecastingService:
             if gemini_horizon_data and "confidence_score" in gemini_horizon_data:
                 conf = int((conf + gemini_horizon_data["confidence_score"]) / 2)
 
+            # --- 1. Synthesize Horizon-Specific Reasons ---
+            h_id = spec["id"]
+            h_reasons: List[str] = []
+
+            if h_id in ["1m", "5m", "10m"]:
+                if obi > 0.05:
+                    h_reasons.append(f"Order book depth skewed towards bids with {obi*100:+.1f}% buy-side imbalance.")
+                elif obi < -0.05:
+                    h_reasons.append(f"Ask side depth dominates with {obi*100:+.1f}% sell-side order book pressure.")
+                else:
+                    h_reasons.append("Order book depth is currently balanced near top-of-book levels.")
+
+                cvd_val = microstructure.cvd if microstructure else 0.0
+                h_reasons.append(f"Taker flow delta indicates {cvd_side.replace('_', ' ').lower()} market order execution (CVD: {cvd_val:+.2f}).")
+                
+                if funding_bias != "NEUTRAL":
+                    h_reasons.append(f"Perpetual funding rate status is {funding_bias.replace('_', ' ')} ({getattr(derivatives, 'funding_rate_pct', 0.0):+.4f}%).")
+                h_reasons.append(f"Micro-volatility band projects ±${vol_spread:.2f} envelope over {spec['label']} horizon.")
+
+            elif h_id in ["30m", "1h", "4h"]:
+                rsi_state = indicators.rsi_state if indicators else "NEUTRAL"
+                h_reasons.append(f"RSI momentum is at {rsi:.1f} ({rsi_state}) with {indicators.trend_state if indicators else 'NEUTRAL'} trend alignment.")
+                h_reasons.append(f"MACD histogram ({macd_hist:+.2f}) reflects {('bullish expansion' if macd_hist > 0 else 'bearish pressure')}.")
+                h_reasons.append(f"Price is {vwap_diff_pct*100:+.2f}% from Intraday VWAP (${vwap:,.2f}), favoring {('mean-reversion' if abs(vwap_diff_pct) > 0.005 else 'equilibrium')} rebalancing.")
+                h_reasons.append(f"Catalyst news sentiment score is {sent_score:+.2f} ({sentiment.overall_sentiment_label if sentiment else 'NEUTRAL'}).")
+
+            else:  # 1d, 7d, 30d
+                m_trend = monthly_context.monthly_trend.replace('_', ' ') if monthly_context else "RANGE BOUND"
+                m_chg = monthly_context.monthly_change_pct if monthly_context else 0.0
+                h_reasons.append(f"30-day macro trend structure is {m_trend} ({m_chg:+.2f}% over last month).")
+                h_pos = monthly_context.range_position_pct if monthly_context else 50.0
+                h_reasons.append(f"Price currently occupies {h_pos:.1f}% of the monthly range with key support at ${monthly_context.key_monthly_support if monthly_context else 0:,.2f}.")
+                st_flow = getattr(onchain, "stablecoin_flow_signal", "NEUTRAL").replace('_', ' ')
+                st_usd = getattr(onchain, "stablecoin_30d_change_usd", 0.0)
+                h_reasons.append(f"DefiLlama reports net 30D stablecoin flow: {st_flow} (${st_usd/1e6:+,.1f}M).")
+                tvl_val = getattr(onchain, "total_defi_tvl_usd", 0.0)
+                h_reasons.append(f"Cross-chain DeFi TVL stands at ${tvl_val/1e9:.2f}B ({getattr(onchain, 'tvl_signal', 'STABLE').lower()} liquidity regime).")
+
+            # --- 2. Off-Chain Market Intelligence ---
+            off_chain_data = {
+                "order_book_imbalance": round(obi, 4),
+                "order_flow_signal": microstructure.order_flow_signal if microstructure else "NEUTRAL",
+                "cvd": round(microstructure.cvd, 2) if microstructure else 0.0,
+                "cvd_side": cvd_side,
+                "funding_rate_pct": round(getattr(derivatives, "funding_rate_pct", 0.0), 4) if derivatives else 0.0,
+                "funding_bias": getattr(derivatives, "funding_bias", "NEUTRAL") if derivatives else "NEUTRAL",
+                "open_interest_usd": getattr(derivatives, "open_interest_usd", 0.0) if derivatives else 0.0,
+                "bid_depth_usd": round(microstructure.bid_depth_usd, 2) if microstructure else 0.0,
+                "ask_depth_usd": round(microstructure.ask_depth_usd, 2) if microstructure else 0.0,
+                "spread_bps": round(microstructure.spread_bps, 2) if microstructure else 0.0,
+                "whale_trades": microstructure.whale_trades_detected if microstructure else 0,
+            }
+
+            # --- 3. On-Chain Liquidity Intelligence ---
+            on_chain_data = {
+                "total_stablecoin_mcap_usd": getattr(onchain, "total_stablecoin_mcap_usd", 0.0) if onchain else 0.0,
+                "stablecoin_dominance_pct": round(getattr(onchain, "stablecoin_dominance_pct", 0.0), 2) if onchain else 0.0,
+                "stablecoin_30d_change_usd": getattr(onchain, "stablecoin_30d_change_usd", 0.0) if onchain else 0.0,
+                "stablecoin_30d_change_pct": round(getattr(onchain, "stablecoin_30d_change_pct", 0.0), 2) if onchain else 0.0,
+                "stablecoin_flow_signal": getattr(onchain, "stablecoin_flow_signal", "NEUTRAL") if onchain else "NEUTRAL",
+                "total_defi_tvl_usd": getattr(onchain, "total_defi_tvl_usd", 0.0) if onchain else 0.0,
+                "tvl_24h_change_pct": round(getattr(onchain, "tvl_24h_change_pct", 0.0), 2) if onchain else 0.0,
+                "tvl_signal": getattr(onchain, "tvl_signal", "STABLE") if onchain else "STABLE",
+                "ethereum_tvl_usd": getattr(onchain, "ethereum_tvl_usd", 0.0) if onchain else 0.0,
+                "solana_tvl_usd": getattr(onchain, "solana_tvl_usd", 0.0) if onchain else 0.0,
+            }
+
+            # --- 4. Chart & Technical Pattern Analysis ---
+            if h_id in ["1m", "5m"]:
+                pattern_detected = "L2 Microstructure Tick Auction" if abs(obi) < 0.1 else ("Bid Wall Absorption Pattern" if obi > 0 else "Ask Wall Resistance Block")
+            elif h_id in ["10m", "30m"]:
+                pattern_detected = "VWAP Mean-Reversion Channel" if abs(vwap_diff_pct) < 0.004 else ("VWAP Trend Continuation" if (vwap_diff_pct > 0 and bias == "BULLISH") else "Overextended VWAP Pullback")
+            elif h_id in ["1h", "4h"]:
+                pattern_detected = "EMA Dynamic Momentum Continuation" if (indicators and indicators.trend_state != "NEUTRAL") else "Session Volatility Squeeze"
+            else:
+                pattern_detected = f"30-Day {monthly_context.monthly_trend.replace('_', ' ') if monthly_context else 'Macro'} Range Channel Rotation"
+
+            sup_p = monthly_context.key_monthly_support if (monthly_context and monthly_context.key_monthly_support > 0) else current_price * 0.98
+            res_p = monthly_context.key_monthly_resistance if (monthly_context and monthly_context.key_monthly_resistance > 0) else current_price * 1.02
+
+            chart_analysis = {
+                "timeframe_trend": "BULLISH" if bias == "BULLISH" else ("BEARISH" if bias == "BEARISH" else "NEUTRAL"),
+                "rsi": round(rsi, 1),
+                "rsi_condition": "OVERSOLD" if rsi < 35 else ("OVERBOUGHT" if rsi > 65 else "NEUTRAL"),
+                "macd_momentum": "EXPANDING_BULLISH" if macd_hist > 0 else ("EXPANDING_BEARISH" if macd_hist < 0 else "NEUTRAL"),
+                "vwap": round(vwap, 2),
+                "vwap_deviation_pct": round(vwap_diff_pct * 100, 2),
+                "key_support": round(sup_p, 2),
+                "key_resistance": round(res_p, 2),
+                "pattern_detected": pattern_detected,
+            }
+
+            # --- 5. Actionable Trading Strategy for this Horizon ---
+            if h_id in ["1m", "5m"]:
+                strat_name = "High-Frequency Microstructure Scalping"
+                strat_type = "SCALP"
+                action_rec = "LONG" if bias == "BULLISH" else ("SHORT" if bias == "BEARISH" else "WAIT")
+                entry_low = round(current_price * 0.9997, 2)
+                entry_high = round(current_price * 1.0003, 2)
+                sl = round(current_price * (0.9985 if bias == "BULLISH" else 1.0015), 2)
+                tp1 = round(p_pred, 2)
+                tp2 = round(p_upper if bias == "BULLISH" else p_lower, 2)
+                rr = 2.1
+                exec_notes = "Submit resting limit orders at inside spread; execute on order book imbalance skew with tight tick stops."
+            elif h_id in ["10m", "30m"]:
+                strat_name = "Intraday VWAP Mean-Reversion & Liquidity Squeeze"
+                strat_type = "INTRADAY_MOMENTUM"
+                action_rec = "LONG" if bias == "BULLISH" else ("SHORT" if bias == "BEARISH" else "HOLD")
+                entry_low = round(current_price * 0.9985, 2)
+                entry_high = round(current_price * 1.0015, 2)
+                sl = round(current_price * (0.994 if bias == "BULLISH" else 1.006), 2)
+                tp1 = round(p_pred, 2)
+                tp2 = round(p_upper if bias == "BULLISH" else p_lower, 2)
+                rr = 2.4
+                exec_notes = "Scale into positions near VWAP bands; take partial profit at price target and trail remainder."
+            elif h_id in ["1h", "4h"]:
+                strat_name = "Session Momentum & Trend Breakout"
+                strat_type = "SWING"
+                action_rec = "BUY" if bias == "BULLISH" else ("SELL" if bias == "BEARISH" else "HOLD")
+                entry_low = round(current_price * 0.996, 2)
+                entry_high = round(current_price * 1.004, 2)
+                sl = round(current_price * (0.988 if bias == "BULLISH" else 1.012), 2)
+                tp1 = round(p_pred, 2)
+                tp2 = round(p_upper if bias == "BULLISH" else p_lower, 2)
+                rr = 2.8
+                exec_notes = "Align with 1H/4H trend momentum; maintain stops below EMA 20 with target scaled to session volatility."
+            else:  # 1d, 7d, 30d
+                strat_name = "Macro Liquidity & Structural Cycle Positioning"
+                strat_type = "MACRO_POSITION"
+                action_rec = "STRONG_BUY" if bias == "BULLISH" else ("STRONG_SELL" if bias == "BEARISH" else "ACCUMULATE")
+                entry_low = round(current_price * 0.985, 2)
+                entry_high = round(current_price * 1.015, 2)
+                sl = round(current_price * (0.94 if bias == "BULLISH" else 1.06), 2)
+                tp1 = round(p_pred, 2)
+                tp2 = round(p_upper if bias == "BULLISH" else p_lower, 2)
+                rr = 3.5
+                exec_notes = "Institutional DCA positioning synchronized with DefiLlama stablecoin supply growth and macro support pivots."
+
+            trading_strategy = {
+                "strategy_name": strat_name,
+                "strategy_type": strat_type,
+                "recommended_action": action_rec,
+                "entry_zone": [entry_low, entry_high],
+                "stop_loss": sl,
+                "take_profit_1": tp1,
+                "take_profit_2": tp2,
+                "risk_reward_ratio": rr,
+                "execution_notes": exec_notes,
+            }
+
             predictions.append(HorizonPrediction(
                 horizon=spec["id"],
                 horizon_label=spec["label"],
@@ -393,7 +543,12 @@ class ForecastingService:
                 lower_bound=round(p_lower, 2),
                 bias=bias,
                 confidence=conf,
-                primary_driver=spec["driver"]
+                primary_driver=spec["driver"],
+                reasons=h_reasons,
+                off_chain_data=off_chain_data,
+                on_chain_data=on_chain_data,
+                chart_analysis=chart_analysis,
+                trading_strategy=trading_strategy
             ))
 
         return predictions

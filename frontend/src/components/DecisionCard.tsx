@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { TradingDecision } from "@/types/market";
 import { Zap, ShieldCheck } from "lucide-react";
 import { MultiHorizonMatrix } from "./MultiHorizonMatrix";
+import { HorizonDetailPanel } from "./HorizonDetailPanel";
 
 interface DecisionCardProps {
   decision: TradingDecision | null;
@@ -17,6 +18,8 @@ export const DecisionCard: React.FC<DecisionCardProps> = ({
   isExecuting,
 }) => {
   const [activeTab, setActiveTab] = useState<"confluence" | "macro" | "forecast" | "micro" | "news" | "risk">("confluence");
+  const [selectedHorizon, setSelectedHorizon] = useState<string>("5m");
+  const [forecastViewMode, setForecastViewMode] = useState<"matrix" | "detail">("matrix");
 
   if (!decision) {
     return (
@@ -229,15 +232,56 @@ export const DecisionCard: React.FC<DecisionCardProps> = ({
             <div className="flex flex-col gap-2 font-mono">
               {decision.price_forecast ? (
                 <>
-                  <div className="flex justify-between items-center text-[10px]">
-                    <span className="text-slate-400 truncate max-w-[210px]">{decision.price_forecast.model_architecture}</span>
+                  <div className="flex justify-between items-center text-[10px] pb-1 border-b border-slate-800/60">
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => setForecastViewMode("matrix")}
+                        className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all ${
+                          forecastViewMode === "matrix"
+                            ? "bg-cyan-600 text-white shadow-sm shadow-cyan-500/30"
+                            : "bg-[#151c2c] text-slate-400 hover:text-slate-200"
+                        }`}
+                      >
+                        All 9 Horizons
+                      </button>
+                      <button
+                        onClick={() => setForecastViewMode("detail")}
+                        className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all ${
+                          forecastViewMode === "detail"
+                            ? "bg-cyan-600 text-white shadow-sm shadow-cyan-500/30"
+                            : "bg-[#151c2c] text-slate-400 hover:text-slate-200"
+                        }`}
+                      >
+                        ⏱️ {selectedHorizon.toUpperCase()} Deep-Dive
+                      </button>
+                    </div>
+
                     <span className="px-1.5 py-0.2 rounded bg-cyan-500/20 text-cyan-400 font-bold shrink-0">
                       {decision.price_forecast.forecast_bias.replace("_", " ")}
                     </span>
                   </div>
 
-                  {/* Multi-Horizon Prediction Matrix (1m to 30d) */}
-                  <MultiHorizonMatrix forecast={decision.price_forecast} />
+                  {forecastViewMode === "matrix" ? (
+                    <MultiHorizonMatrix
+                      forecast={decision.price_forecast}
+                      selectedHorizon={selectedHorizon}
+                      onSelectHorizon={(h) => {
+                        setSelectedHorizon(h);
+                        setForecastViewMode("detail");
+                      }}
+                    />
+                  ) : (
+                    <HorizonDetailPanel
+                      prediction={
+                        decision.price_forecast.multi_horizon_predictions?.find(
+                          (hp) => hp.horizon === selectedHorizon
+                        ) || decision.price_forecast.multi_horizon_predictions?.[0]!
+                      }
+                      allPredictions={decision.price_forecast.multi_horizon_predictions || []}
+                      onSelectHorizon={(h) => setSelectedHorizon(h)}
+                      onClose={() => setForecastViewMode("matrix")}
+                    />
+                  )}
 
                   <p className="font-sans text-slate-300 text-[11px] leading-snug pt-1 border-t border-slate-800/80">
                     {decision.price_forecast.rationale}

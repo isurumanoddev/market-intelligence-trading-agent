@@ -71,6 +71,11 @@ class HorizonPrediction(BaseModel):
     bias: str = "NEUTRAL"  # BULLISH, BEARISH, NEUTRAL
     confidence: int = 70  # 0 to 100%
     primary_driver: str = ""
+    reasons: List[str] = []
+    off_chain_data: Dict[str, Any] = {}
+    on_chain_data: Dict[str, Any] = {}
+    chart_analysis: Dict[str, Any] = {}
+    trading_strategy: Dict[str, Any] = {}
 
 class ForecastPoint(BaseModel):
     day: int

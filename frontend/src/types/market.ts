@@ -139,6 +139,57 @@ export interface MonthlyContext {
   macro_bias: "BULLISH" | "BEARISH" | "NEUTRAL";
 }
 
+export interface HorizonOffChainData {
+  order_book_imbalance: number;
+  order_flow_signal: string;
+  cvd: number;
+  cvd_side: string;
+  funding_rate_pct: number;
+  funding_bias: string;
+  open_interest_usd: number;
+  bid_depth_usd: number;
+  ask_depth_usd: number;
+  spread_bps: number;
+  whale_trades: number;
+}
+
+export interface HorizonOnChainData {
+  total_stablecoin_mcap_usd: number;
+  stablecoin_dominance_pct: number;
+  stablecoin_30d_change_usd: number;
+  stablecoin_30d_change_pct: number;
+  stablecoin_flow_signal: string;
+  total_defi_tvl_usd: number;
+  tvl_24h_change_pct: number;
+  tvl_signal: string;
+  ethereum_tvl_usd: number;
+  solana_tvl_usd: number;
+}
+
+export interface HorizonChartAnalysis {
+  timeframe_trend: "BULLISH" | "BEARISH" | "NEUTRAL";
+  rsi?: number;
+  rsi_condition: string;
+  macd_momentum: string;
+  vwap: number;
+  vwap_deviation_pct: number;
+  key_support: number;
+  key_resistance: number;
+  pattern_detected: string;
+}
+
+export interface HorizonTradingStrategy {
+  strategy_name: string;
+  strategy_type: "SCALP" | "INTRADAY_MOMENTUM" | "SWING" | "MACRO_POSITION";
+  recommended_action: string;
+  entry_zone: number[];
+  stop_loss: number;
+  take_profit_1: number;
+  take_profit_2: number;
+  risk_reward_ratio: number;
+  execution_notes: string;
+}
+
 export interface HorizonPrediction {
   horizon: string; // "1m" | "5m" | "10m" | "30m" | "1h" | "4h" | "1d" | "7d" | "30d"
   horizon_label: string; // "1 Min", "5 Min", etc.
@@ -150,6 +201,11 @@ export interface HorizonPrediction {
   bias: "BULLISH" | "BEARISH" | "NEUTRAL";
   confidence: number;
   primary_driver: string;
+  reasons?: string[];
+  off_chain_data?: HorizonOffChainData;
+  on_chain_data?: HorizonOnChainData;
+  chart_analysis?: HorizonChartAnalysis;
+  trading_strategy?: HorizonTradingStrategy;
 }
 
 export interface ForecastPoint {
