@@ -1,18 +1,22 @@
 "use client";
 
 import React, { useState } from "react";
-import { Sparkles, RefreshCw, Settings, Zap } from "lucide-react";
+import { Sparkles, RefreshCw, Settings, Zap, GraduationCap, BookOpen } from "lucide-react";
 
 interface HeaderProps {
   currentSymbol: string;
   onSelectSymbol: (sym: string) => void;
   hasGeminiKey: boolean;
   onOpenSettings: () => void;
+  onOpenTradingBot?: () => void;
+  onOpenHelp?: () => void;
+  botStatusText?: string;
   refreshInterval: number;
   onChangeRefreshInterval: (interval: number) => void;
   onManualRefresh: () => void;
   isLoading: boolean;
 }
+
 
 const DEFAULT_SYMBOLS = ["BTC/USDT", "ETH/USDT", "SOL/USDT", "AAPL", "NVDA", "TSLA"];
 
@@ -21,11 +25,15 @@ export const Header: React.FC<HeaderProps> = ({
   onSelectSymbol,
   hasGeminiKey,
   onOpenSettings,
+  onOpenTradingBot,
+  onOpenHelp,
+  botStatusText,
   refreshInterval,
   onChangeRefreshInterval,
   onManualRefresh,
   isLoading,
 }) => {
+
   const [customInput, setCustomInput] = useState("");
 
   const handleCustomSubmit = (e: React.FormEvent) => {
@@ -94,6 +102,41 @@ export const Header: React.FC<HeaderProps> = ({
           LIVE FEED
         </div>
 
+        {/* Autonomous Trading Bot & Backtest Button */}
+        {onOpenTradingBot && (
+          <button
+            onClick={onOpenTradingBot}
+            className={`flex items-center gap-1.5 px-3 py-1 rounded text-xs font-mono font-semibold transition-all border ${
+              botStatusText === "RUNNING"
+                ? "bg-cyan-950/60 text-cyan-300 border-cyan-500/40 shadow-md shadow-cyan-950/50 hover:bg-cyan-900/60"
+                : botStatusText === "PAUSED"
+                ? "bg-amber-950/60 text-amber-300 border-amber-500/40 hover:bg-amber-900/60"
+                : "bg-[#171f30] text-slate-300 border-slate-700 hover:text-white hover:bg-slate-800"
+            }`}
+            title="Open Autonomous Trading Bot & Backtesting Studio"
+          >
+            <span className="text-sm">🤖</span>
+            <span>BOT STUDIO</span>
+            {botStatusText && (
+              <span className={`w-2 h-2 rounded-full ${
+                botStatusText === "RUNNING" ? "bg-emerald-400 animate-ping" : botStatusText === "PAUSED" ? "bg-amber-400" : "bg-slate-500"
+              }`} />
+            )}
+          </button>
+        )}
+
+        {/* Academy & Help Center Button */}
+        {onOpenHelp && (
+          <button
+            onClick={onOpenHelp}
+            className="flex items-center gap-1.5 px-3 py-1 rounded text-xs font-mono font-semibold transition-all border bg-gradient-to-r from-blue-950/60 to-purple-950/60 border-cyan-500/40 text-cyan-300 shadow-sm hover:from-blue-900/60 hover:to-purple-900/60 hover:text-white"
+            title="Open Trading Academy & Beginner Guide"
+          >
+            <GraduationCap className="w-4 h-4 text-cyan-400" />
+            <span>ACADEMY & GUIDE</span>
+          </button>
+        )}
+
         {/* Gemini AI Status Badge */}
         <button
           onClick={onOpenSettings}
@@ -105,8 +148,9 @@ export const Header: React.FC<HeaderProps> = ({
           title="Click to configure Google Gemini API Key"
         >
           <Sparkles className="w-3.5 h-3.5" />
-          <span>{hasGeminiKey ? "Gemini 2.5 Active" : "Add Gemini Key"}</span>
+          <span>{hasGeminiKey ? "Gemini 3.7 Active" : "Add Gemini Key"}</span>
         </button>
+
 
         {/* Auto Refresh Select */}
         <div className="flex items-center gap-1.5 text-xs text-slate-400">

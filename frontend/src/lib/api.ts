@@ -3,7 +3,9 @@ import {
   Candle,
   PortfolioState,
   SettingsData,
+  LLMPredictionResult,
 } from "@/types/market";
+
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ||
@@ -110,3 +112,19 @@ export async function updateSettings(payload: {
   if (!res.ok) throw new Error("Failed to save settings");
   return res.json();
 }
+
+export async function fetchLLMPrediction(
+  symbol: string,
+  bypassCache: boolean = false
+): Promise<LLMPredictionResult> {
+  const res = await fetch(
+    `${API_BASE}/market/llm-predict?symbol=${encodeURIComponent(symbol)}&bypass_cache=${bypassCache}`,
+    { cache: "no-store" }
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Failed to fetch LLM prediction" }));
+    throw new Error(err.detail || "Failed to fetch LLM prediction");
+  }
+  return res.json();
+}
+

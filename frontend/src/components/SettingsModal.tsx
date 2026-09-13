@@ -10,6 +10,7 @@ interface SettingsModalProps {
   settings: SettingsData | null;
   onSave: (payload: {
     gemini_api_key?: string;
+    coinglass_api_key?: string;
     default_exchange?: string;
     max_risk_per_trade_pct?: number;
     max_spread_pct?: number;
@@ -23,6 +24,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onSave,
 }) => {
   const [apiKey, setApiKey] = useState("");
+  const [coinglassKey, setCoinglassKey] = useState("");
   const [exchange, setExchange] = useState(settings?.default_exchange || "kraken");
   const [riskPct, setRiskPct] = useState(settings?.max_risk_per_trade_pct || 2.0);
   const [maxSpread, setMaxSpread] = useState(settings?.max_spread_pct || 0.5);
@@ -41,6 +43,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       };
       if (apiKey.trim()) {
         payload.gemini_api_key = apiKey.trim();
+      }
+      if (coinglassKey.trim()) {
+        payload.coinglass_api_key = coinglassKey.trim();
       }
       await onSave(payload);
       onClose();
@@ -83,6 +88,21 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <p className="text-[10px] text-slate-500">
               Powers deep reasoning for the AI Master Trading Arbiter and semantic news analysis. (Leave empty to use built-in quantitative heuristic engine).
             </p>
+          </div>
+
+          {/* CoinGlass Key */}
+          <div className="space-y-1.5">
+            <label className="flex items-center gap-1.5 font-semibold text-slate-300">
+              <Key className="w-3.5 h-3.5 text-blue-400" />
+              CoinGlass API Key (Optional):
+            </label>
+            <input
+              type="password"
+              placeholder={settings?.has_coinglass_key ? "Key is configured (enter new to update)" : "Enter CoinGlass API Key..."}
+              value={coinglassKey}
+              onChange={(e) => setCoinglassKey(e.target.value)}
+              className="w-full bg-[#090d15] border border-slate-800 focus:border-blue-500 rounded p-2 text-slate-200 font-mono outline-none"
+            />
           </div>
 
           {/* Default Exchange */}

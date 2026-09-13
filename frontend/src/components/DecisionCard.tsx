@@ -3,6 +3,8 @@
 import React, { useState } from "react";
 import { TradingDecision } from "@/types/market";
 import { Zap, ShieldCheck } from "lucide-react";
+import { MultiHorizonMatrix } from "./MultiHorizonMatrix";
+import { HorizonDetailPanel } from "./HorizonDetailPanel";
 
 interface DecisionCardProps {
   decision: TradingDecision | null;
@@ -15,12 +17,35 @@ export const DecisionCard: React.FC<DecisionCardProps> = ({
   onExecuteTrade,
   isExecuting,
 }) => {
-  const [activeTab, setActiveTab] = useState<"confluence" | "macro" | "micro" | "news" | "risk">("confluence");
+  const [activeTab, setActiveTab] = useState<"confluence" | "macro" | "forecast" | "micro" | "news" | "risk">("confluence");
+  const [selectedHorizon, setSelectedHorizon] = useState<string>("5m");
+  const [forecastViewMode, setForecastViewMode] = useState<"matrix" | "detail">("matrix");
 
   if (!decision) {
     return (
-      <div className="bg-[#111622] border border-slate-800 rounded p-4 text-xs font-mono text-slate-500">
-        Synthesizing market signals...
+      <div className="bg-[#0e1424] border border-slate-800/90 rounded-lg p-4 shadow-xl flex flex-col gap-3 font-mono">
+        <div className="flex justify-between items-center text-[10px] text-slate-400 font-bold border-b border-slate-800/80 pb-2">
+          <span className="flex items-center gap-1.5 text-cyan-400">
+            <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+            AI MASTER TRADING ARBITER
+          </span>
+          <span className="text-slate-500">QUANT-SYNTHESIS</span>
+        </div>
+        <div className="flex items-center gap-4 py-2">
+          <div className="h-8 w-28 bg-slate-800/70 rounded-md animate-pulse" />
+          <div className="flex-1 space-y-2">
+            <div className="flex justify-between">
+              <div className="h-3 w-20 bg-slate-800/60 rounded animate-pulse" />
+              <div className="h-3 w-10 bg-slate-800/60 rounded animate-pulse" />
+            </div>
+            <div className="h-2 w-full bg-slate-800/80 rounded-full animate-pulse" />
+          </div>
+        </div>
+        <div className="grid grid-cols-3 gap-2 py-1">
+          <div className="h-10 bg-slate-800/50 rounded animate-pulse" />
+          <div className="h-10 bg-slate-800/50 rounded animate-pulse" />
+          <div className="h-10 bg-slate-800/50 rounded animate-pulse" />
+        </div>
       </div>
     );
   }
@@ -144,6 +169,16 @@ export const DecisionCard: React.FC<DecisionCardProps> = ({
             30D Macro
           </button>
           <button
+            onClick={() => setActiveTab("forecast")}
+            className={`px-2 py-0.5 text-[11px] rounded transition-colors ${
+              activeTab === "forecast"
+                ? "bg-cyan-950/80 text-cyan-300 font-semibold border border-cyan-500/40 shadow-sm"
+                : "text-slate-500 hover:text-slate-300"
+            }`}
+          >
+            🔮 AI Forecast
+          </button>
+          <button
             onClick={() => setActiveTab("micro")}
             className={`px-2 py-0.5 text-[11px] rounded transition-colors ${
               activeTab === "micro"
@@ -210,6 +245,71 @@ export const DecisionCard: React.FC<DecisionCardProps> = ({
                     <span className="text-cyan-400 font-bold">{monthly.volume_trend}</span>
                   </div>
                 </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === "forecast" && (
+            <div className="flex flex-col gap-2 font-mono">
+              {decision.price_forecast ? (
+                <>
+                  <div className="flex justify-between items-center text-[10px] pb-1 border-b border-slate-800/60">
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => setForecastViewMode("matrix")}
+                        className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all ${
+                          forecastViewMode === "matrix"
+                            ? "bg-cyan-600 text-white shadow-sm shadow-cyan-500/30"
+                            : "bg-[#151c2c] text-slate-400 hover:text-slate-200"
+                        }`}
+                      >
+                        All 9 Horizons
+                      </button>
+                      <button
+                        onClick={() => setForecastViewMode("detail")}
+                        className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all ${
+                          forecastViewMode === "detail"
+                            ? "bg-cyan-600 text-white shadow-sm shadow-cyan-500/30"
+                            : "bg-[#151c2c] text-slate-400 hover:text-slate-200"
+                        }`}
+                      >
+                        ⏱️ {selectedHorizon.toUpperCase()} Deep-Dive
+                      </button>
+                    </div>
+
+                    <span className="px-1.5 py-0.2 rounded bg-cyan-500/20 text-cyan-400 font-bold shrink-0">
+                      {decision.price_forecast.forecast_bias.replace("_", " ")}
+                    </span>
+                  </div>
+
+                  {forecastViewMode === "matrix" ? (
+                    <MultiHorizonMatrix
+                      forecast={decision.price_forecast}
+                      selectedHorizon={selectedHorizon}
+                      onSelectHorizon={(h) => {
+                        setSelectedHorizon(h);
+                        setForecastViewMode("detail");
+                      }}
+                    />
+                  ) : (
+                    <HorizonDetailPanel
+                      prediction={
+                        decision.price_forecast.multi_horizon_predictions?.find(
+                          (hp) => hp.horizon === selectedHorizon
+                        ) || decision.price_forecast.multi_horizon_predictions?.[0]!
+                      }
+                      allPredictions={decision.price_forecast.multi_horizon_predictions || []}
+                      onSelectHorizon={(h) => setSelectedHorizon(h)}
+                      onClose={() => setForecastViewMode("matrix")}
+                    />
+                  )}
+
+                  <p className="font-sans text-slate-300 text-[11px] leading-snug pt-1 border-t border-slate-800/80">
+                    {decision.price_forecast.rationale}
+                  </p>
+                </>
+              ) : (
+                <p className="font-sans text-slate-400">Forecasting engine is generating multi-horizon trajectory...</p>
               )}
             </div>
           )}

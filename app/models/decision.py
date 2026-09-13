@@ -60,6 +60,23 @@ class MonthlyContext(BaseModel):
     volume_trend: str = "NORMAL"        # EXPANDING, CONTRACTING, NORMAL
     macro_bias: str = "NEUTRAL"
 
+class HorizonPrediction(BaseModel):
+    horizon: str  # "1m", "5m", "10m", "30m", "1h", "4h", "1d", "7d", "30d"
+    horizon_label: str  # "1 Min", "5 Min", "10 Min", "30 Min", "1 Hour", "4 Hours", "1 Day", "7 Days", "30 Days"
+    target_time_str: str  # e.g. "00:22", "01:21", "Sep 14", "Oct 13"
+    predicted_price: float
+    expected_change_pct: float
+    upper_bound: float
+    lower_bound: float
+    bias: str = "NEUTRAL"  # BULLISH, BEARISH, NEUTRAL
+    confidence: int = 70  # 0 to 100%
+    primary_driver: str = ""
+    reasons: List[str] = []
+    off_chain_data: Dict[str, Any] = {}
+    on_chain_data: Dict[str, Any] = {}
+    chart_analysis: Dict[str, Any] = {}
+    trading_strategy: Dict[str, Any] = {}
+
 class ForecastPoint(BaseModel):
     day: int
     date_str: str
@@ -79,8 +96,9 @@ class PriceForecastResult(BaseModel):
     projected_range_max: float
     forecast_bias: str = "RANGE_CONSOLIDATION"  # BULLISH_EXPANSION, BEARISH_REVERSAL, RANGE_CONSOLIDATION
     confidence_score: int = 75  # 0 to 100%
-    model_architecture: str = "Hybrid Deep Learning LSTM + Google Gemini Cognitive Synthesis"
+    model_architecture: str = "Hybrid Multi-Horizon Deep Learning + Google Gemini Cognitive Synthesis"
     trajectory: List[ForecastPoint] = []
+    multi_horizon_predictions: List[HorizonPrediction] = []
     rationale: str = ""
     timestamp: str = ""
 
@@ -143,3 +161,30 @@ class PortfolioState(BaseModel):
     open_positions_count: int
     positions: List[PaperPosition] = []
     trades_history: List[PaperTradeRecord] = []
+
+class LLMHorizonPrediction(BaseModel):
+    horizon: str  # "30m", "1h", "4h", "1d"
+    horizon_label: str  # "30 Minutes", "1 Hour", "4 Hours", "1 Day"
+    predicted_price: float
+    expected_change_pct: float = 0.0
+    direction: str = "NEUTRAL"  # BULLISH / BEARISH / NEUTRAL
+    confidence: int = 70  # 0 to 100
+    price_range_low: float = 0.0
+    price_range_high: float = 0.0
+    reasoning: str = ""
+    key_factors: List[str] = []
+    risk_level: str = "MEDIUM"  # LOW / MEDIUM / HIGH / EXTREME
+    recommended_action: str = "HOLD"  # BUY / SELL / HOLD / WAIT
+
+class LLMPredictionResult(BaseModel):
+    symbol: str
+    current_price: float
+    timestamp: str = ""
+    model_used: str = "Google Gemini 3.7 Flash Reasoning Engine"
+    market_summary: str = ""
+    overall_bias: str = "NEUTRAL"  # BULLISH / BEARISH / NEUTRAL
+    overall_confidence: int = 70
+    predictions: List[LLMHorizonPrediction] = []
+    context_used: Dict[str, Any] = {}
+    generation_time_ms: int = 0
+

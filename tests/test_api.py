@@ -54,3 +54,26 @@ def test_paper_trade_api_lifecycle():
     assert close_res.status_code == 200
     closed_trade = close_res.json()["trade"]
     assert closed_trade["pnl"] > 0
+
+def test_backtest_api_endpoint():
+    res = client.post("/api/backtest/run", json={
+        "symbol": "BTC/USDT",
+        "strategy": "EMA_RSI",
+        "timeframe": "1h",
+        "lookback_days": 30,
+        "initial_capital": 10000.0
+    })
+    assert res.status_code == 200
+    data = res.json()
+    assert "metrics" in data
+    assert "equity_curve" in data
+    assert "trades" in data
+    assert data["metrics"]["initial_capital"] == 10000.0
+
+def test_bot_status_api_endpoint():
+    res = client.get("/api/bot/status")
+    assert res.status_code == 200
+    data = res.json()
+    assert "config" in data
+    assert "stats" in data
+    assert "recent_logs" in data

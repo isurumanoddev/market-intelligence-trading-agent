@@ -65,7 +65,20 @@ export const NewsFeed: React.FC<NewsFeedProps> = ({ news, sentiment }) => {
 
       {/* News Items Scroll */}
       <div className="space-y-2 overflow-y-auto max-h-[260px] pr-1">
-        {filteredNews.length === 0 ? (
+        {news.length === 0 ? (
+          <div className="space-y-2">
+            {[...Array(3)].map((_, i) => (
+              <div key={`sk-news-${i}`} className="bg-[#171f30]/60 border border-slate-800/80 rounded p-2.5 animate-pulse space-y-1.5">
+                <div className="flex justify-between">
+                  <div className="h-2.5 w-24 bg-slate-700/50 rounded" />
+                  <div className="h-2.5 w-16 bg-slate-700/50 rounded" />
+                </div>
+                <div className="h-3 w-full bg-slate-700/60 rounded" />
+                <div className="h-3 w-4/5 bg-slate-700/60 rounded" />
+              </div>
+            ))}
+          </div>
+        ) : filteredNews.length === 0 ? (
           <div className="text-slate-500 text-xs font-mono py-4 text-center">
             No news items matching selected filter.
           </div>

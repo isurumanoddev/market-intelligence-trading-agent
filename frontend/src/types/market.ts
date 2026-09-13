@@ -139,6 +139,102 @@ export interface MonthlyContext {
   macro_bias: "BULLISH" | "BEARISH" | "NEUTRAL";
 }
 
+export interface HorizonOffChainData {
+  order_book_imbalance: number;
+  order_flow_signal: string;
+  cvd: number;
+  cvd_side: string;
+  funding_rate_pct: number;
+  funding_bias: string;
+  open_interest_usd: number;
+  bid_depth_usd: number;
+  ask_depth_usd: number;
+  spread_bps: number;
+  whale_trades: number;
+}
+
+export interface HorizonOnChainData {
+  total_stablecoin_mcap_usd: number;
+  stablecoin_dominance_pct: number;
+  stablecoin_30d_change_usd: number;
+  stablecoin_30d_change_pct: number;
+  stablecoin_flow_signal: string;
+  total_defi_tvl_usd: number;
+  tvl_24h_change_pct: number;
+  tvl_signal: string;
+  ethereum_tvl_usd: number;
+  solana_tvl_usd: number;
+}
+
+export interface HorizonChartAnalysis {
+  timeframe_trend: "BULLISH" | "BEARISH" | "NEUTRAL";
+  rsi?: number;
+  rsi_condition: string;
+  macd_momentum: string;
+  vwap: number;
+  vwap_deviation_pct: number;
+  key_support: number;
+  key_resistance: number;
+  pattern_detected: string;
+}
+
+export interface HorizonTradingStrategy {
+  strategy_name: string;
+  strategy_type: "SCALP" | "INTRADAY_MOMENTUM" | "SWING" | "MACRO_POSITION";
+  recommended_action: string;
+  entry_zone: number[];
+  stop_loss: number;
+  take_profit_1: number;
+  take_profit_2: number;
+  risk_reward_ratio: number;
+  execution_notes: string;
+}
+
+export interface HorizonPrediction {
+  horizon: string; // "1m" | "5m" | "10m" | "30m" | "1h" | "4h" | "1d" | "7d" | "30d"
+  horizon_label: string; // "1 Min", "5 Min", etc.
+  target_time_str: string;
+  predicted_price: number;
+  expected_change_pct: number;
+  upper_bound: number;
+  lower_bound: number;
+  bias: "BULLISH" | "BEARISH" | "NEUTRAL";
+  confidence: number;
+  primary_driver: string;
+  reasons?: string[];
+  off_chain_data?: HorizonOffChainData;
+  on_chain_data?: HorizonOnChainData;
+  chart_analysis?: HorizonChartAnalysis;
+  trading_strategy?: HorizonTradingStrategy;
+}
+
+export interface ForecastPoint {
+  day: number;
+  date_str: string;
+  predicted_price: number;
+  upper_bound: number;
+  lower_bound: number;
+}
+
+export interface PriceForecastResult {
+  symbol: string;
+  current_price: number;
+  horizon_days: number;
+  target_7d: number;
+  target_30d: number;
+  expected_return_7d_pct: number;
+  expected_return_30d_pct: number;
+  projected_range_min: number;
+  projected_range_max: number;
+  forecast_bias: "BULLISH_EXPANSION" | "BEARISH_REVERSAL" | "RANGE_CONSOLIDATION";
+  confidence_score: number;
+  model_architecture: string;
+  trajectory: ForecastPoint[];
+  multi_horizon_predictions?: HorizonPrediction[];
+  rationale: string;
+  timestamp: string;
+}
+
 export interface TradingDecision {
   symbol: string;
   action: "STRONG_BUY" | "BUY" | "HOLD" | "SELL" | "STRONG_SELL";
@@ -158,6 +254,7 @@ export interface TradingDecision {
   macro_view?: string;
   risk_view: string;
   monthly_context?: MonthlyContext | null;
+  price_forecast?: PriceForecastResult | null;
   model_used: string;
   timestamp: string;
 }
@@ -202,6 +299,49 @@ export interface PortfolioState {
   trades_history: PaperTradeRecord[];
 }
 
+export interface DerivativesData {
+  symbol: string;
+  funding_rate: number;
+  funding_rate_pct: number;
+  funding_rate_annualized_pct: number;
+  next_funding_time: string;
+  funding_bias: "LONG_CROWDED" | "SHORT_CROWDED" | "NEUTRAL";
+  open_interest_usd: number;
+  open_interest_change_pct: number;
+  leverage_signal: "OVERLEVERAGED_LONG" | "OVERLEVERAGED_SHORT" | "NORMAL";
+  long_short_ratio: number;
+  data_source: string;
+  timestamp: string;
+}
+
+export interface OnChainData {
+  total_stablecoin_mcap_usd: number;
+  stablecoin_dominance_pct: number;
+  stablecoin_30d_change_usd: number;
+  stablecoin_30d_change_pct: number;
+  stablecoin_flow_signal: "STRONG_INFLOW" | "INFLOW" | "NEUTRAL" | "OUTFLOW" | "STRONG_OUTFLOW";
+  total_defi_tvl_usd: number;
+  tvl_24h_change_pct: number;
+  tvl_signal: "EXPANDING" | "STABLE" | "CONTRACTING";
+  ethereum_tvl_usd: number;
+  solana_tvl_usd: number;
+  data_source: string;
+  timestamp: string;
+}
+
+export interface CoinGlassData {
+  symbol: string;
+  long_liquidations_24h_usd: number;
+  short_liquidations_24h_usd: number;
+  total_liquidations_24h_usd: number;
+  liquidation_dominance: "LONG_FLUSH" | "SHORT_SQUEEZE" | "BALANCED";
+  aggregated_oi_usd: number;
+  aggregated_oi_change_4h_pct: number;
+  top_trader_long_short_ratio: number;
+  data_source: string;
+  timestamp: string;
+}
+
 export interface FullAnalysisData {
   symbol: string;
   ticker: Ticker;
@@ -210,6 +350,10 @@ export interface FullAnalysisData {
   indicators: TechnicalIndicators;
   microstructure: MicrostructureMetrics;
   monthly_context?: MonthlyContext | null;
+  derivatives?: DerivativesData | null;
+  onchain?: OnChainData | null;
+  coinglass?: CoinGlassData | null;
+  price_forecast?: PriceForecastResult | null;
   sentiment: SentimentMetrics;
   news: NewsItem[];
   decision: TradingDecision;
@@ -218,8 +362,170 @@ export interface FullAnalysisData {
 export interface SettingsData {
   has_gemini_key: boolean;
   gemini_key_masked: string;
+  has_coinglass_key?: boolean;
+  coinglass_key_masked?: string;
+  has_telegram?: boolean;
+  telegram_chat_id_masked?: string;
   default_exchange: string;
   default_symbols: string[];
   max_risk_per_trade_pct: number;
   max_spread_pct: number;
 }
+
+export interface BacktestRequest {
+  symbol: string;
+  strategy: 
+    | "EMA_RSI" 
+    | "MACD" 
+    | "BOLLINGER_REVERSION" 
+    | "DERIVATIVES_SQUEEZE" 
+    | "NEWS_MACRO_MOMENTUM" 
+    | "QUANT_ALPHA_CONFLUENCE"
+    | "CONFLUENCE";
+  timeframe: string;
+  lookback_days: number;
+  initial_capital: number;
+  position_size_pct: number;
+  stop_loss_pct: number;
+  take_profit_pct: number;
+  trailing_stop_pct: number;
+  fee_pct: number;
+}
+
+export interface BacktestTrade {
+  id: string;
+  symbol: string;
+  side: string;
+  entry_time: string;
+  exit_time: string;
+  entry_price: number;
+  exit_price: number;
+  size: number;
+  pnl: number;
+  pnl_pct: number;
+  exit_reason: string;
+}
+
+export interface EquityPoint {
+  timestamp: string;
+  equity: number;
+  drawdown_pct: number;
+  price: number;
+}
+
+export interface BacktestMetrics {
+  initial_capital: number;
+  final_equity: number;
+  net_profit_usd: number;
+  net_profit_pct: number;
+  total_trades: number;
+  winning_trades: number;
+  losing_trades: number;
+  win_rate_pct: number;
+  profit_factor: number;
+  max_drawdown_pct: number;
+  sharpe_ratio: number;
+  sortino_ratio: number;
+  avg_trade_pnl_usd: number;
+  avg_trade_pnl_pct: number;
+  max_consecutive_wins: number;
+  max_consecutive_losses: number;
+  benchmark_return_pct: number;
+}
+
+export interface BacktestResult {
+  parameters: Record<string, any>;
+  metrics: BacktestMetrics;
+  equity_curve: EquityPoint[];
+  trades: BacktestTrade[];
+}
+
+export interface BotConfig {
+  enabled: boolean;
+  mode: "PAPER" | "LIVE";
+  symbols: string[];
+  strategy: string;
+  min_conviction: number;
+  trade_size_usd: number;
+  max_open_positions: number;
+  auto_sl_tp: boolean;
+  stop_loss_pct: number;
+  take_profit_pct: number;
+  trailing_stop_enabled: boolean;
+  trailing_stop_pct: number;
+  max_daily_loss_usd: number;
+  cooldown_seconds: number;
+  poll_interval_seconds: number;
+}
+
+export interface BotStats {
+  status: "STOPPED" | "RUNNING" | "PAUSED";
+  uptime_seconds: number;
+  total_trades: number;
+  winning_trades: number;
+  losing_trades: number;
+  win_rate_pct: number;
+  total_realized_pnl: number;
+  profit_factor: number;
+  active_positions_count: number;
+  last_eval_time: string;
+  daily_drawdown_usd: number;
+  circuit_breaker_triggered: boolean;
+}
+
+export interface BotLogEntry {
+  id: string;
+  timestamp: string;
+  level: "INFO" | "SIGNAL" | "TRADE" | "RISK" | "WARNING" | "ERROR";
+  symbol?: string | null;
+  message: string;
+  details?: Record<string, any> | null;
+}
+
+export interface MacroTelemetry {
+  funding_rate_pct?: number;
+  funding_bias?: string;
+  open_interest_usd?: number;
+  stablecoin_flow_signal?: string;
+  stablecoin_30d_change_usd?: number;
+  total_defi_tvl_usd?: number;
+  news_sentiment_score?: number;
+  news_sentiment_label?: string;
+  top_catalyst?: string;
+}
+
+export interface BotStatusResponse {
+  config: BotConfig;
+  stats: BotStats;
+  macro_telemetry?: MacroTelemetry;
+  recent_logs: BotLogEntry[];
+}
+
+export interface LLMHorizonPrediction {
+  horizon: "30m" | "1h" | "4h" | "1d" | string;
+  horizon_label: string;
+  predicted_price: number;
+  expected_change_pct: number;
+  direction: "BULLISH" | "BEARISH" | "NEUTRAL";
+  confidence: number;
+  price_range_low: number;
+  price_range_high: number;
+  reasoning: string;
+  key_factors: string[];
+  risk_level: "LOW" | "MEDIUM" | "HIGH" | "EXTREME" | string;
+  recommended_action: "BUY" | "SELL" | "HOLD" | "WAIT" | string;
+}
+
+export interface LLMPredictionResult {
+  symbol: string;
+  current_price: number;
+  timestamp: string;
+  model_used: string;
+  market_summary: string;
+  overall_bias: "BULLISH" | "BEARISH" | "NEUTRAL";
+  overall_confidence: number;
+  predictions: LLMHorizonPrediction[];
+  context_used?: Record<string, any>;
+  generation_time_ms: number;
+}
+
