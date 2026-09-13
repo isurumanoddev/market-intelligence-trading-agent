@@ -27,6 +27,7 @@ class TradeOrderRequest(BaseModel):
     side: str
     price: float
     amount: float
+    leverage: float = 1.0
     stop_loss: Optional[float] = None
     take_profit: Optional[float] = None
     reason: str = "Manual / Agent Signal"
@@ -357,6 +358,7 @@ async def execute_trade(req: TradeOrderRequest):
             side=req.side,
             price=req.price,
             amount=req.amount,
+            leverage=req.leverage,
             stop_loss=req.stop_loss,
             take_profit=req.take_profit,
             reason=req.reason

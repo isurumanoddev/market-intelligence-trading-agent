@@ -147,6 +147,9 @@ class PaperPosition(BaseModel):
     current_price: float
     amount: float
     cost_basis: float
+    margin: float = 0.0
+    leverage: float = 1.0
+    liquidation_price: Optional[float] = None
     current_value: float
     unrealized_pnl: float
     unrealized_pnl_pct: float
@@ -161,6 +164,7 @@ class PaperTradeRecord(BaseModel):
     price: float
     amount: float
     value: float
+    leverage: float = 1.0
     pnl: float = 0.0
     reason: str = ""
     timestamp: str

@@ -14,6 +14,7 @@ import { SettingsModal } from "@/components/SettingsModal";
 import { TradingBotStudioModal } from "@/components/TradingBotStudioModal";
 import { LLMPredictionPanel } from "@/components/LLMPredictionPanel";
 import { HelpAcademyModal } from "@/components/HelpAcademyModal";
+import { PaperTradeModal } from "@/components/PaperTradeModal";
 import {
   fetchAnalysis,
   fetchCandles,
@@ -85,6 +86,14 @@ export default function DashboardPage() {
   const [isTradingBotOpen, setIsTradingBotOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [botStatusText, setBotStatusText] = useState<string>("STOPPED");
+  const [isTradeModalOpen, setIsTradeModalOpen] = useState(false);
+  const [tradeModalParams, setTradeModalParams] = useState<{
+    side?: "BUY" | "SELL";
+    entry?: number;
+    sl?: number;
+    tp?: number;
+    leverage?: number;
+  }>({});
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [llmPrediction, setLlmPrediction] = useState<LLMPredictionResult | null>(null);
@@ -209,6 +218,44 @@ export default function DashboardPage() {
     const interval = setInterval(checkBot, 5000);
     return () => clearInterval(interval);
   }, []);
+
+  // Open Paper Trade Order Modal (custom size, leverage, TP, SL)
+  const handleOpenTradeModal = useCallback(
+    (params?: {
+      side?: "BUY" | "SELL";
+      entry?: number;
+      sl?: number;
+      tp?: number;
+      leverage?: number;
+    }) => {
+      setTradeModalParams(params || {});
+      setIsTradeModalOpen(true);
+    },
+    []
+  );
+
+  // Execute Order from Ticket Modal
+  const handleModalExecute = async (payload: {
+    symbol: string;
+    side: "BUY" | "SELL";
+    price: number;
+    amount: number;
+    leverage: number;
+    stop_loss?: number;
+    take_profit?: number;
+    reason?: string;
+  }) => {
+    setIsExecutingTrade(true);
+    try {
+      await executeTrade(payload);
+      await loadPortfolioData();
+    } catch (err: any) {
+      console.error("Trade execution error:", err);
+      throw err;
+    } finally {
+      setIsExecutingTrade(false);
+    }
+  };
 
   // Execute Paper Trade (supports DecisionCard & In-Chart Signals)
   const handleExecuteTrade = async (
@@ -403,6 +450,7 @@ export default function DashboardPage() {
               decision={analysis?.decision || null}
               currentPrice={analysis?.ticker?.price || 0}
               onExecuteTrade={handleExecuteTrade}
+              onOpenTradeModal={handleOpenTradeModal}
               isExecutingTrade={isExecutingTrade}
             />
           )}
@@ -452,6 +500,7 @@ export default function DashboardPage() {
           <DecisionCard
             decision={analysis?.decision || null}
             onExecuteTrade={handleExecuteTrade}
+            onOpenTradeModal={handleOpenTradeModal}
             isExecuting={isExecutingTrade}
           />
           <NewsFeed
@@ -466,6 +515,7 @@ export default function DashboardPage() {
         portfolio={portfolio}
         onClosePosition={handleClosePosition}
         onResetPortfolio={handleResetPortfolio}
+        onOpenTradeModal={() => handleOpenTradeModal()}
       />
 
       {/* Settings Modal */}
@@ -487,6 +537,21 @@ export default function DashboardPage() {
       <HelpAcademyModal
         isOpen={isHelpOpen}
         onClose={() => setIsHelpOpen(false)}
+      />
+
+      {/* Interactive Paper Trading Order Ticket Modal (Leverage, Position Size, TP, SL, TV Paper Link) */}
+      <PaperTradeModal
+        isOpen={isTradeModalOpen}
+        onClose={() => setIsTradeModalOpen(false)}
+        symbol={currentSymbol}
+        currentPrice={tradeModalParams.entry || analysis?.ticker?.price || analysis?.decision?.current_price || 0}
+        initialSide={tradeModalParams.side || (analysis?.decision?.action?.includes("SELL") ? "SELL" : "BUY")}
+        initialEntry={tradeModalParams.entry}
+        initialSl={tradeModalParams.sl}
+        initialTp={tradeModalParams.tp}
+        initialLeverage={tradeModalParams.leverage || 5}
+        portfolio={portfolio}
+        onExecute={handleModalExecute}
       />
     </div>
   );

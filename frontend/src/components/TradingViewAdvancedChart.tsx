@@ -40,6 +40,7 @@ interface TradingViewAdvancedChartProps {
   decision?: TradingDecision | null;
   currentPrice?: number;
   onExecuteTrade?: (side?: "BUY" | "SELL", entry?: number, sl?: number, tp?: number) => void;
+  onOpenTradeModal?: (params?: { side?: "BUY" | "SELL"; entry?: number; sl?: number; tp?: number; leverage?: number }) => void;
   isExecutingTrade?: boolean;
 }
 
@@ -86,6 +87,7 @@ export const TradingViewAdvancedChart: React.FC<TradingViewAdvancedChartProps> =
   decision = null,
   currentPrice = 0,
   onExecuteTrade,
+  onOpenTradeModal,
   isExecutingTrade = false,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -457,7 +459,7 @@ export const TradingViewAdvancedChart: React.FC<TradingViewAdvancedChartProps> =
         category: "AI",
         type: isBuy ? "BUY" : "SELL",
         trigger: `${decision.conviction}% Conviction Synthesis`,
-        rule: decision.reasoning_summary || "Synthesized across Order Book Microstructure, Derivatives Funding, & Technicals.",
+        rule: decision.summary || "Synthesized across Order Book Microstructure, Derivatives Funding, & Technicals.",
         winRate: 76.2,
         confidence: decision.conviction,
         timeframe: "Multi-Horizon",
@@ -667,6 +669,16 @@ export const TradingViewAdvancedChart: React.FC<TradingViewAdvancedChartProps> =
   }, [isFullscreen]);
 
   const handleExecute = () => {
+    if (onOpenTradeModal) {
+      onOpenTradeModal({
+        side: activeTradePlan.side,
+        entry: activeTradePlan.entry,
+        sl: activeTradePlan.sl,
+        tp: activeTradePlan.tp,
+        leverage: 5,
+      });
+      return;
+    }
     if (!onExecuteTrade) return;
     onExecuteTrade(activeTradePlan.side, activeTradePlan.entry, activeTradePlan.sl, activeTradePlan.tp);
     setTradeSuccessMsg(`Order placed: ${activeTradePlan.side} at $${activeTradePlan.entry.toLocaleString()} (TP: $${activeTradePlan.tp.toLocaleString()} | SL: $${activeTradePlan.sl.toLocaleString()})`);

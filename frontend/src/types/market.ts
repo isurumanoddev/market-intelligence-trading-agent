@@ -281,6 +281,9 @@ export interface PaperPosition {
   current_price: number;
   amount: number;
   cost_basis: number;
+  margin?: number;
+  leverage?: number;
+  liquidation_price?: number | null;
   current_value: number;
   unrealized_pnl: number;
   unrealized_pnl_pct: number;
@@ -296,6 +299,7 @@ export interface PaperTradeRecord {
   price: number;
   amount: number;
   value: number;
+  leverage?: number;
   pnl: number;
   reason: string;
   timestamp: string;
@@ -395,7 +399,11 @@ export interface BacktestRequest {
     | "DERIVATIVES_SQUEEZE" 
     | "NEWS_MACRO_MOMENTUM" 
     | "QUANT_ALPHA_CONFLUENCE"
-    | "CONFLUENCE";
+    | "CONFLUENCE"
+    | "SUPERTREND_ATR"
+    | "SMART_MONEY_FVG"
+    | "STOCH_RSI_CROSS"
+    | "VWAP_MEAN_REVERSION";
   timeframe: string;
   lookback_days: number;
   initial_capital: number;

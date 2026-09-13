@@ -53,6 +53,7 @@ export async function executeTrade(payload: {
   side: "BUY" | "SELL";
   price: number;
   amount: number;
+  leverage?: number;
   stop_loss?: number;
   take_profit?: number;
   reason?: string;

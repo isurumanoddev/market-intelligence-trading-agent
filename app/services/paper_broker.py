@@ -42,26 +42,39 @@ class PaperBrokerService:
         side: str,  # 'BUY' or 'SELL'
         price: float,
         amount: float,
+        leverage: float = 1.0,
         stop_loss: Optional[float] = None,
         take_profit: Optional[float] = None,
         reason: str = "Manual / AI Decision"
     ) -> PaperPosition:
         side = side.upper()
-        cost_basis = price * amount
+        leverage = max(1.0, min(100.0, float(leverage or 1.0)))
+        cost_basis = price * amount  # Total notional position value
+        margin = cost_basis / leverage
         fee = cost_basis * self.fee_rate
 
-        total_deduction = cost_basis + fee
+        total_deduction = margin + fee
         if total_deduction > self.cash:
             # Adjust amount if cash is insufficient
-            available = max(self.cash - 10.0, 0.0)
+            available = max(self.cash - 5.0, 0.0)
             if available <= 0:
                 raise ValueError("Insufficient cash balance to execute order.")
-            amount = available / (price * (1.0 + self.fee_rate))
+            amount = available / (price * ((1.0 / leverage) + self.fee_rate))
             cost_basis = price * amount
+            margin = cost_basis / leverage
             fee = cost_basis * self.fee_rate
-            total_deduction = cost_basis + fee
+            total_deduction = margin + fee
 
         self.cash -= total_deduction
+
+        # Calculate estimated liquidation price
+        if leverage > 1.0:
+            if side == "BUY":
+                liquidation_price = price * (1.0 - (0.9 / leverage))
+            else:
+                liquidation_price = price * (1.0 + (0.9 / leverage))
+        else:
+            liquidation_price = None
 
         now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         pos_id = f"pos_{uuid.uuid4().hex[:8]}"
@@ -74,9 +87,12 @@ class PaperBrokerService:
             current_price=round(price, 4),
             amount=round(amount, 6),
             cost_basis=round(cost_basis, 2),
-            current_value=round(cost_basis, 2),
+            margin=round(margin, 2),
+            leverage=round(leverage, 1),
+            liquidation_price=round(liquidation_price, 4) if liquidation_price else None,
+            current_value=round(margin, 2),
             unrealized_pnl=round(-fee, 2),
-            unrealized_pnl_pct=round((-fee / cost_basis * 100), 2),
+            unrealized_pnl_pct=round((-fee / margin * 100), 2) if margin > 0 else 0.0,
             stop_loss=round(stop_loss, 4) if stop_loss else None,
             take_profit=round(take_profit, 4) if take_profit else None,
             opened_at=now_str
@@ -93,6 +109,7 @@ class PaperBrokerService:
             price=round(price, 4),
             amount=round(amount, 6),
             value=round(cost_basis, 2),
+            leverage=round(leverage, 1),
             pnl=round(-fee, 2),
             reason=reason,
             timestamp=now_str
@@ -105,8 +122,9 @@ class PaperBrokerService:
             raise KeyError(f"Position {position_id} not found.")
 
         pos = self.positions.pop(position_id)
-        current_value = current_price * pos.amount
-        fee = current_value * self.fee_rate
+        current_notional = current_price * pos.amount
+        fee = current_notional * self.fee_rate
+        margin = pos.margin if pos.margin > 0 else (pos.cost_basis / max(1.0, pos.leverage))
 
         if pos.side == "BUY":
             gross_pnl = (current_price - pos.entry_price) * pos.amount
@@ -114,8 +132,9 @@ class PaperBrokerService:
             gross_pnl = (pos.entry_price - current_price) * pos.amount
 
         net_pnl = gross_pnl - fee
+        returned_cash = max(0.0, margin + net_pnl)
         self.realized_pnl += net_pnl
-        self.cash += (current_value - fee)
+        self.cash += returned_cash
 
         now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         closing_side = "SELL" if pos.side == "BUY" else "BUY"
@@ -126,7 +145,8 @@ class PaperBrokerService:
             side=closing_side,
             price=round(current_price, 4),
             amount=pos.amount,
-            value=round(current_value, 2),
+            value=round(current_notional, 2),
+            leverage=pos.leverage,
             pnl=round(net_pnl, 2),
             reason=f"{reason} (Entry: {pos.entry_price})",
             timestamp=now_str
@@ -142,15 +162,22 @@ class PaperBrokerService:
                 continue
 
             pos.current_price = price
-            pos.current_value = round(price * pos.amount, 2)
+            margin = pos.margin if pos.margin > 0 else (pos.cost_basis / max(1.0, pos.leverage))
             if pos.side == "BUY":
                 pnl = (price - pos.entry_price) * pos.amount
             else:
                 pnl = (pos.entry_price - price) * pos.amount
             pos.unrealized_pnl = round(pnl, 2)
-            pos.unrealized_pnl_pct = round((pnl / pos.cost_basis * 100), 2) if pos.cost_basis > 0 else 0.0
+            pos.unrealized_pnl_pct = round((pnl / margin * 100), 2) if margin > 0 else 0.0
+            pos.current_value = round(max(0.0, margin + pnl), 2)
 
-            # Check automated triggers
+            # Check liquidation trigger
+            if pos.liquidation_price is not None:
+                if (pos.side == "BUY" and price <= pos.liquidation_price) or (pos.side == "SELL" and price >= pos.liquidation_price):
+                    to_close.append((pos_id, price, f"Liquidated (Margin Call at ${price})"))
+                    continue
+
+            # Check automated SL / TP triggers
             if pos.stop_loss and ((pos.side == "BUY" and price <= pos.stop_loss) or (pos.side == "SELL" and price >= pos.stop_loss)):
                 to_close.append((pos_id, price, "Stop Loss Triggered"))
             elif pos.take_profit and ((pos.side == "BUY" and price >= pos.take_profit) or (pos.side == "SELL" and price <= pos.take_profit)):

@@ -2,18 +2,20 @@
 
 import React from "react";
 import { PortfolioState } from "@/types/market";
-import { Briefcase, RotateCcw } from "lucide-react";
+import { Briefcase, RotateCcw, Zap } from "lucide-react";
 
 interface PortfolioFooterProps {
   portfolio: PortfolioState | null;
   onClosePosition: (id: string, currentPrice: number) => void;
   onResetPortfolio: () => void;
+  onOpenTradeModal?: () => void;
 }
 
 export const PortfolioFooter: React.FC<PortfolioFooterProps> = ({
   portfolio,
   onClosePosition,
   onResetPortfolio,
+  onOpenTradeModal,
 }) => {
   const cash = portfolio?.cash || 100000;
   const equity = portfolio?.equity || 100000;
@@ -29,13 +31,22 @@ export const PortfolioFooter: React.FC<PortfolioFooterProps> = ({
           <Briefcase className="w-4 h-4 text-cyan-400" />
           <span className="font-bold text-white text-xs tracking-wider">PAPER TRADING SIMULATOR</span>
           <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#171f30] text-slate-400 font-mono">
-            Virtual \$100k Margin Account
+            Virtual $100k Margin Account
           </span>
+          {onOpenTradeModal && (
+            <button
+              onClick={onOpenTradeModal}
+              className="ml-2 flex items-center gap-1.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold px-3 py-1 rounded-md text-xs shadow-md shadow-cyan-950/60 transition-all active:scale-95"
+            >
+              <Zap className="w-3.5 h-3.5 fill-white" />
+              <span>+ New Trade</span>
+            </button>
+          )}
         </div>
 
         <div className="flex items-center gap-6 font-mono">
           <div className="flex flex-col">
-            <span className="text-[9px] text-slate-500 uppercase">Cash Balance</span>
+            <span className="text-[9px] text-slate-500 uppercase">Available Cash</span>
             <span className="text-white font-bold">${cash.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
           </div>
 
@@ -74,51 +85,90 @@ export const PortfolioFooter: React.FC<PortfolioFooterProps> = ({
             <tr className="text-slate-500 text-[10px] uppercase border-b border-slate-800">
               <th className="pb-1.5">Symbol</th>
               <th className="pb-1.5">Side</th>
-              <th className="pb-1.5">Size</th>
+              <th className="pb-1.5">Leverage</th>
+              <th className="pb-1.5">Size / Notional</th>
+              <th className="pb-1.5">Margin</th>
               <th className="pb-1.5">Entry Price</th>
               <th className="pb-1.5">Current Price</th>
-              <th className="pb-1.5">Cost Basis</th>
-              <th className="pb-1.5">Current Value</th>
+              <th className="pb-1.5">Liq Price</th>
               <th className="pb-1.5">Unrealized PnL</th>
-              <th className="pb-1.5">Stop Loss</th>
-              <th className="pb-1.5">Take Profit</th>
+              <th className="pb-1.5">TP / SL</th>
               <th className="pb-1.5 text-right">Action</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800/40">
             {positions.length === 0 ? (
               <tr>
-                <td colSpan={11} className="py-3 text-center text-slate-500 font-sans text-xs">
-                  No active open positions. Execute a trade using the AI Decision card above.
+                <td colSpan={11} className="py-5 text-center text-slate-500 font-sans text-xs">
+                  <div className="flex flex-col items-center justify-center gap-2">
+                    <p>No active open positions in this paper trading margin account.</p>
+                    {onOpenTradeModal && (
+                      <button
+                        onClick={onOpenTradeModal}
+                        className="flex items-center gap-1.5 bg-cyan-600/20 hover:bg-cyan-600/30 border border-cyan-500/40 text-cyan-300 px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all"
+                      >
+                        <Zap className="w-3.5 h-3.5" />
+                        <span>+ Open New Paper Trade</span>
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ) : (
-              positions.map((p) => (
-                <tr key={p.id} className="hover:bg-slate-800/20">
-                  <td className="py-1.5 font-bold text-white">{p.symbol}</td>
-                  <td className={`py-1.5 font-bold ${p.side === "BUY" ? "text-emerald-400" : "text-rose-400"}`}>
-                    {p.side}
-                  </td>
-                  <td className="py-1.5 text-slate-300">{p.amount}</td>
-                  <td className="py-1.5 text-slate-300">${formatPrice(p.entry_price)}</td>
-                  <td className="py-1.5 text-white font-semibold">${formatPrice(p.current_price)}</td>
-                  <td className="py-1.5 text-slate-400">${formatCompact(p.cost_basis)}</td>
-                  <td className="py-1.5 text-slate-300">${formatCompact(p.current_value)}</td>
-                  <td className={`py-1.5 font-bold ${p.unrealized_pnl >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
-                    {p.unrealized_pnl >= 0 ? "+" : ""}${p.unrealized_pnl.toFixed(2)} ({p.unrealized_pnl_pct.toFixed(2)}%)
-                  </td>
-                  <td className="py-1.5 text-slate-400">{p.stop_loss ? `$${formatPrice(p.stop_loss)}` : "--"}</td>
-                  <td className="py-1.5 text-slate-400">{p.take_profit ? `$${formatPrice(p.take_profit)}` : "--"}</td>
-                  <td className="py-1.5 text-right">
-                    <button
-                      onClick={() => onClosePosition(p.id, p.current_price)}
-                      className="bg-rose-500/15 hover:bg-rose-600 border border-rose-500/40 text-rose-400 hover:text-white px-2 py-0.5 rounded text-[10px] transition-colors"
-                    >
-                      Close
-                    </button>
-                  </td>
-                </tr>
-              ))
+              positions.map((p) => {
+                const notional = p.cost_basis || (p.amount * p.entry_price);
+                const margin = p.margin || (notional / Math.max(1, p.leverage || 1));
+                const lev = p.leverage || 1;
+                return (
+                  <tr key={p.id} className="hover:bg-slate-800/20">
+                    <td className="py-2 font-bold text-white">{p.symbol}</td>
+                    <td className="py-2">
+                      <span className={`px-1.5 py-0.2 rounded font-black text-[10px] ${
+                        p.side === "BUY"
+                          ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                          : "bg-rose-500/20 text-rose-400 border border-rose-500/30"
+                      }`}>
+                        {p.side === "BUY" ? "LONG" : "SHORT"}
+                      </span>
+                    </td>
+                    <td className="py-2">
+                      <span className="px-1.5 py-0.2 rounded bg-amber-500/15 border border-amber-500/30 text-amber-300 font-bold text-[10px]">
+                        {lev}x
+                      </span>
+                    </td>
+                    <td className="py-2 text-slate-300">
+                      <div>{p.amount}</div>
+                      <div className="text-[9px] text-slate-500">${formatCompact(notional)}</div>
+                    </td>
+                    <td className="py-2 text-cyan-300 font-semibold">${formatCompact(margin)}</td>
+                    <td className="py-2 text-slate-300">${formatPrice(p.entry_price)}</td>
+                    <td className="py-2 text-white font-bold">${formatPrice(p.current_price)}</td>
+                    <td className="py-2 text-rose-400">
+                      {p.liquidation_price ? `$${formatPrice(p.liquidation_price)}` : "--"}
+                    </td>
+                    <td className={`py-2 font-bold ${p.unrealized_pnl >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                      <div>
+                        {p.unrealized_pnl >= 0 ? "+" : ""}${p.unrealized_pnl.toFixed(2)}
+                      </div>
+                      <div className="text-[9px]">
+                        ({p.unrealized_pnl >= 0 ? "+" : ""}{p.unrealized_pnl_pct.toFixed(1)}% ROI)
+                      </div>
+                    </td>
+                    <td className="py-2 text-[10px] text-slate-400">
+                      <div className="text-emerald-400">TP: {p.take_profit ? `$${formatPrice(p.take_profit)}` : "--"}</div>
+                      <div className="text-rose-400">SL: {p.stop_loss ? `$${formatPrice(p.stop_loss)}` : "--"}</div>
+                    </td>
+                    <td className="py-2 text-right">
+                      <button
+                        onClick={() => onClosePosition(p.id, p.current_price)}
+                        className="bg-rose-500/15 hover:bg-rose-600 border border-rose-500/40 text-rose-400 hover:text-white px-2.5 py-1 rounded text-[11px] font-bold transition-all"
+                      >
+                        Close
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
