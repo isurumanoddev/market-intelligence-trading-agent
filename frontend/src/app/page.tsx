@@ -399,6 +399,11 @@ export default function DashboardPage() {
                 currentTimeframe === "5m" ? "5" :
                 currentTimeframe === "1m" ? "1" : "60"
               }
+              indicators={analysis?.indicators || null}
+              decision={analysis?.decision || null}
+              currentPrice={analysis?.ticker?.price || 0}
+              onExecuteTrade={handleExecuteTrade}
+              isExecutingTrade={isExecutingTrade}
             />
           )}
         </div>

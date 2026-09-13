@@ -143,7 +143,7 @@ export const CandleChart: React.FC<CandleChartProps> = ({
   const [tradeSuccessMsg, setTradeSuccessMsg] = useState<string | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const TIMEFRAMES = ["1m", "5m", "15m", "1h", "4h", "1d", "30D"];
+  const TIMEFRAMES = ["1m", "5m", "15m", "1h", "4h", "1d"];
 
   // Handle ESC key to exit fullscreen
   useEffect(() => {
@@ -531,11 +531,8 @@ export const CandleChart: React.FC<CandleChartProps> = ({
     };
   }, [signalMode, confluenceScore.dominantBias, decision, lastPrice, swings]);
 
-  // Forecast points
-  const forecastPoints = useMemo(() => {
-    if (!showForecast || !forecast?.trajectory || forecast.trajectory.length === 0) return [];
-    return forecast.trajectory.filter((_, idx) => idx % 3 === 0 || idx === forecast.trajectory.length - 1);
-  }, [showForecast, forecast]);
+  // Forecast points disabled - focused purely on price action & indicators
+  const forecastPoints: any[] = [];
 
   const forwardBuffer = 14;
   const totalSlots = validCandles.length + forecastPoints.length + forwardBuffer;
@@ -846,18 +843,6 @@ export const CandleChart: React.FC<CandleChartProps> = ({
             <span className="font-bold">{isFullscreen ? "Exit Fullscreen" : "Fullscreen"}</span>
           </button>
 
-          {/* Fit Mode Toggle */}
-          <button
-            onClick={() => setCandleFit(!candleFit)}
-            className={`flex items-center gap-1 px-2 py-1 text-[10px] font-mono rounded border transition-all ${
-              candleFit
-                ? "bg-blue-600/20 border-blue-500/50 text-blue-300 font-bold"
-                : "bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200"
-            }`}
-            title="Toggle between full-height candlesticks or fitting the 30D cone"
-          >
-            <span>{candleFit ? "Fit: Candles" : "Fit: 30D Cone"}</span>
-          </button>
 
           {/* Strategy Visualization Toggle */}
           <button
@@ -959,20 +944,6 @@ export const CandleChart: React.FC<CandleChartProps> = ({
             </button>
           )}
 
-          {/* AI Forecast Toggle */}
-          {forecast && (
-            <button
-              onClick={() => setShowForecast(!showForecast)}
-              className={`flex items-center gap-1 px-2 py-1 text-[10px] font-mono rounded border transition-all ${
-                showForecast
-                  ? "bg-cyan-500/20 border-cyan-500/50 text-cyan-300 shadow-[0_0_10px_rgba(6,182,212,0.2)]"
-                  : "bg-slate-900 border-slate-800 text-slate-500 hover:text-slate-300"
-              }`}
-            >
-              {showForecast ? <Eye className="w-3 h-3 text-cyan-400" /> : <EyeOff className="w-3 h-3" />}
-              <span>30D Cone</span>
-            </button>
-          )}
 
           {/* Timeframe Buttons */}
           <div className="flex items-center bg-[#070a12] p-0.5 rounded border border-slate-800">
