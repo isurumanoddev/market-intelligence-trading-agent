@@ -69,7 +69,7 @@ function generateInitialCandles(symbol: string, timeframe: string): Candle[] {
 export default function DashboardPage() {
   const [currentSymbol, setCurrentSymbol] = useState("BTC/USDT");
   const [currentTimeframe, setCurrentTimeframe] = useState("1h");
-  const [activeChartView, setActiveChartView] = useState<"AI_QUANT" | "TRADINGVIEW">("AI_QUANT");
+  const [activeChartView, setActiveChartView] = useState<"AI_QUANT" | "TRADINGVIEW">("TRADINGVIEW");
   const [isChartWide, setIsChartWide] = useState(true);
   const [refreshInterval, setRefreshInterval] = useState(10000);
   const [centerTab, setCenterTab] = useState<"book" | "tape">("book");
@@ -320,6 +320,8 @@ export default function DashboardPage() {
     await loadAnalysis(currentSymbol);
   };
 
+  const activePosition = portfolio?.positions?.find((p) => p.symbol === currentSymbol) || null;
+
   return (
     <div className="min-h-screen bg-[#070a13] text-slate-100 flex flex-col font-sans select-none antialiased">
       {/* Top Application Header */}
@@ -449,6 +451,8 @@ export default function DashboardPage() {
               indicators={analysis?.indicators || null}
               decision={analysis?.decision || null}
               currentPrice={analysis?.ticker?.price || 0}
+              activePosition={activePosition}
+              onClosePosition={handleClosePosition}
               onExecuteTrade={handleExecuteTrade}
               onOpenTradeModal={handleOpenTradeModal}
               isExecutingTrade={isExecutingTrade}
