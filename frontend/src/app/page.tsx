@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Header } from "@/components/Header";
 import { TickerBanner } from "@/components/TickerBanner";
 import { CandleChart } from "@/components/CandleChart";
+import { TradingViewAdvancedChart } from "@/components/TradingViewAdvancedChart";
 import { OrderBookLadder } from "@/components/OrderBookLadder";
 import { TradeTape } from "@/components/TradeTape";
 import { DecisionCard } from "@/components/DecisionCard";
@@ -67,6 +68,8 @@ function generateInitialCandles(symbol: string, timeframe: string): Candle[] {
 export default function DashboardPage() {
   const [currentSymbol, setCurrentSymbol] = useState("BTC/USDT");
   const [currentTimeframe, setCurrentTimeframe] = useState("1h");
+  const [activeChartView, setActiveChartView] = useState<"AI_QUANT" | "TRADINGVIEW">("AI_QUANT");
+  const [isChartWide, setIsChartWide] = useState(false);
   const [refreshInterval, setRefreshInterval] = useState(10000);
   const [centerTab, setCenterTab] = useState<"book" | "tape">("book");
 
@@ -331,20 +334,73 @@ export default function DashboardPage() {
       {/* Main Trading Terminal Multi-Column Grid */}
       <main className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-3 p-3">
 
-        {/* Left Column: Candlestick Chart & Quantitative Oscillators (5 cols) */}
-        <div className="lg:col-span-5 flex flex-col gap-3">
-          <CandleChart
-            candles={candles}
-            indicators={analysis?.indicators || null}
-            forecast={analysis?.price_forecast || null}
-            decision={analysis?.decision || null}
-            currentTimeframe={currentTimeframe}
-            onChangeTimeframe={handleTimeframeChange}
-            exchange={analysis?.ticker?.exchange || "KRAKEN"}
-            isLoading={isCandlesLoading}
-            onExecuteTrade={handleExecuteTrade}
-            isExecutingTrade={isExecutingTrade}
-          />
+        {/* Left Column: Candlestick Chart & Quantitative Oscillators */}
+        <div className={`${isChartWide ? "lg:col-span-8" : "lg:col-span-5"} flex flex-col gap-2 transition-all duration-300`}>
+          {/* Chart Mode Switcher Header */}
+          <div className="flex items-center justify-between bg-slate-900/90 px-3 py-1.5 rounded-lg border border-slate-800 text-xs font-mono">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-slate-500 uppercase tracking-wider mr-1">Chart Engine:</span>
+              <button
+                onClick={() => setActiveChartView("AI_QUANT")}
+                className={`px-2.5 py-1 rounded font-bold transition-all flex items-center gap-1.5 text-xs ${
+                  activeChartView === "AI_QUANT"
+                    ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm shadow-cyan-500/10"
+                    : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
+                }`}
+              >
+                <span>🔮 AI Quant Terminal</span>
+                <span className="text-[10px] opacity-75 hidden sm:inline">(Predictions & S/R)</span>
+              </button>
+
+              <button
+                onClick={() => setActiveChartView("TRADINGVIEW")}
+                className={`px-2.5 py-1 rounded font-bold transition-all flex items-center gap-1.5 text-xs ${
+                  activeChartView === "TRADINGVIEW"
+                    ? "bg-blue-600/30 text-blue-300 border border-blue-500/50 shadow-sm shadow-blue-500/10"
+                    : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
+                }`}
+              >
+                <span>📈 TradingView Advanced</span>
+                <span className="text-[10px] opacity-75 hidden sm:inline">(100+ Indicators)</span>
+              </button>
+            </div>
+
+            {/* Layout Expand Button */}
+            <button
+              onClick={() => setIsChartWide(!isChartWide)}
+              className="text-[11px] text-slate-400 hover:text-white px-2 py-0.5 rounded border border-slate-700/60 hover:bg-slate-800 transition-colors hidden xl:inline-block"
+              title="Expand chart canvas to 8 columns"
+            >
+              {isChartWide ? "⤺ Standard (5 Cols)" : "⤢ Wide View (8 Cols)"}
+            </button>
+          </div>
+
+          {/* Active Chart Component */}
+          {activeChartView === "AI_QUANT" ? (
+            <CandleChart
+              candles={candles}
+              indicators={analysis?.indicators || null}
+              forecast={analysis?.price_forecast || null}
+              decision={analysis?.decision || null}
+              currentTimeframe={currentTimeframe}
+              onChangeTimeframe={handleTimeframeChange}
+              exchange={analysis?.ticker?.exchange || "KRAKEN"}
+              isLoading={isCandlesLoading}
+              onExecuteTrade={handleExecuteTrade}
+              isExecutingTrade={isExecutingTrade}
+            />
+          ) : (
+            <TradingViewAdvancedChart
+              symbol={currentSymbol}
+              defaultInterval={
+                currentTimeframe === "1d" ? "D" :
+                currentTimeframe === "4h" ? "240" :
+                currentTimeframe === "15m" ? "15" :
+                currentTimeframe === "5m" ? "5" :
+                currentTimeframe === "1m" ? "1" : "60"
+              }
+            />
+          )}
         </div>
 
         {/* Center Column: Order Book Depth Ladder & Trade Tape (3 cols) */}

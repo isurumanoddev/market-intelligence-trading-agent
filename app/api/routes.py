@@ -18,6 +18,7 @@ from app.services.backtest_engine import backtest_engine, BacktestRequest
 from app.services.trading_bot import trading_bot
 from app.services.telegram_service import telegram_service
 from app.services.llm_predictor import llm_predictor
+from app.services.tradingview_service import tradingview_service
 
 router = APIRouter()
 
@@ -467,3 +468,42 @@ async def test_telegram_notification(req: TelegramTestRequest):
         chat_id=req.chat_id
     )
     return {"success": success}
+
+
+# ------------------ TradingView UDF Compatible API ------------------
+
+@router.get("/tradingview/config")
+async def get_tradingview_config():
+    """TradingView UDF /config endpoint."""
+    return tradingview_service.get_config()
+
+@router.get("/tradingview/time")
+async def get_tradingview_time():
+    """TradingView UDF /time endpoint."""
+    return tradingview_service.get_time()
+
+@router.get("/tradingview/symbols")
+async def resolve_tradingview_symbol(symbol: str = Query("BTC/USDT")):
+    """TradingView UDF /symbols endpoint."""
+    return tradingview_service.resolve_symbol(symbol)
+
+@router.get("/tradingview/search")
+async def search_tradingview_symbols(query: str = Query(""), limit: int = Query(30)):
+    """TradingView UDF /search endpoint."""
+    return tradingview_service.search_symbols(query, limit)
+
+@router.get("/tradingview/history")
+async def get_tradingview_history(
+    symbol: str = Query("BTC/USDT"),
+    resolution: str = Query("60"),
+    from_ts: Optional[int] = Query(None, alias="from"),
+    to_ts: Optional[int] = Query(None, alias="to")
+):
+    """TradingView UDF /history endpoint."""
+    return await asyncio.to_thread(
+        tradingview_service.get_history,
+        symbol=symbol,
+        resolution=resolution,
+        from_ts=from_ts,
+        to_ts=to_ts
+    )
