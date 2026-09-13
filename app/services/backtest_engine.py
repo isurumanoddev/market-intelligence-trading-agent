@@ -13,7 +13,7 @@ from app.services.technical_analysis import technical_analyzer
 
 class BacktestRequest(BaseModel):
     symbol: str = "BTC/USDT"
-    strategy: str = "EMA_RSI"          # "EMA_RSI", "MACD", "BOLLINGER_REVERSION", "DERIVATIVES_SQUEEZE", "NEWS_MACRO_MOMENTUM", "QUANT_ALPHA_CONFLUENCE"
+    strategy: str = "EMA_RSI"          # "EMA_RSI", "MACD", "BOLLINGER_REVERSION", "DERIVATIVES_SQUEEZE", "NEWS_MACRO_MOMENTUM", "QUANT_ALPHA_CONFLUENCE", "SUPERTREND_ATR", "SMART_MONEY_FVG", "STOCH_RSI_CROSS", "VWAP_MEAN_REVERSION"
     timeframe: str = "1h"              # "15m", "1h", "4h", "1d"
     lookback_days: int = 90
     initial_capital: float = 10000.0
@@ -208,6 +208,46 @@ class BacktestEngine:
         df["vol_ratio"] = (df["volume"] / df["vol_sma_20"].replace(0, np.nan)).fillna(1.0)
         df["macro_sentiment_proxy"] = (df["macro_trend_24"] * 4.0) + ((df["rsi"] - 50.0) / 80.0)
 
+        # 7. Supertrend (ATR 10, Multiplier 3.0)
+        h_l = df["high"] - df["low"]
+        h_pc = (df["high"] - df["close"].shift(1)).abs()
+        l_pc = (df["low"] - df["close"].shift(1)).abs()
+        tr = pd.concat([h_l, h_pc, l_pc], axis=1).max(axis=1)
+        df["atr_10"] = tr.rolling(10).mean().fillna(df["close"] * 0.02)
+        hl2 = (df["high"] + df["low"]) / 2.0
+        df["st_upper"] = hl2 + (3.0 * df["atr_10"])
+        df["st_lower"] = hl2 - (3.0 * df["atr_10"])
+        df["supertrend_direction"] = np.where(df["close"] >= df["st_lower"], 1, -1)
+
+        # 8. Stochastic RSI (14, 14, 3, 3)
+        min_rsi = df["rsi"].rolling(14).min()
+        max_rsi = df["rsi"].rolling(14).max()
+        df["stoch_k"] = (((df["rsi"] - min_rsi) / (max_rsi - min_rsi + 1e-9)) * 100.0).fillna(50.0)
+        df["stoch_d"] = df["stoch_k"].rolling(3).mean().fillna(df["stoch_k"])
+
+        # 9. ADX (14)
+        up_move = df["high"].diff()
+        down_move = -df["low"].diff()
+        plus_dm = np.where((up_move > down_move) & (up_move > 0), up_move, 0.0)
+        minus_dm = np.where((down_move > up_move) & (down_move > 0), down_move, 0.0)
+        atr_14 = tr.rolling(14).mean().fillna(df["close"] * 0.02)
+        p_di = (pd.Series(plus_dm, index=df.index).rolling(14).mean() / (atr_14 + 1e-9)) * 100.0
+        m_di = (pd.Series(minus_dm, index=df.index).rolling(14).mean() / (atr_14 + 1e-9)) * 100.0
+        dx = (abs(p_di - m_di) / (p_di + m_di + 1e-9)) * 100.0
+        df["adx"] = dx.rolling(14).mean().fillna(25.0)
+
+        # 10. VWAP & Multi-Sigma Bands
+        cum_vol = df["volume"].cumsum()
+        cum_pv = (hl2 * df["volume"]).cumsum()
+        df["vwap"] = (cum_pv / cum_vol.replace(0, np.nan)).fillna(df["close"])
+        df["vwap_std"] = df["close"].rolling(20).std().fillna(df["close"] * 0.015)
+        df["vwap_upper"] = df["vwap"] + (1.25 * df["vwap_std"])
+        df["vwap_lower"] = df["vwap"] - (1.25 * df["vwap_std"])
+
+        # 11. Fair Value Gap (FVG)
+        df["bullish_fvg"] = (df["low"] > df["high"].shift(2)) & (df["close"] > df["open"])
+        df["bearish_fvg"] = (df["high"] < df["low"].shift(2)) & (df["close"] < df["open"])
+
         return df
 
     def _simulate_strategy(
@@ -285,6 +325,22 @@ class BacktestEngine:
                         exit_price = price
                         exit_reason = "MACRO_REGIME_REVERSAL"
                         closed = True
+                    elif req.strategy in ["SUPERTREND_ATR", "SUPERTREND"] and row["supertrend_direction"] < 0:
+                        exit_price = price
+                        exit_reason = "SUPERTREND_FLIP_EXIT"
+                        closed = True
+                    elif req.strategy in ["SMART_MONEY_FVG", "SMC_FVG"] and row["bearish_fvg"]:
+                        exit_price = price
+                        exit_reason = "SMC_SUPPLY_IMBALANCE_EXIT"
+                        closed = True
+                    elif req.strategy in ["STOCH_RSI_CROSS", "STOCH_RSI"] and row["stoch_k"] >= 80 and row["stoch_k"] < row["stoch_d"]:
+                        exit_price = price
+                        exit_reason = "STOCH_OVERBOUGHT_CROSS_EXIT"
+                        closed = True
+                    elif req.strategy in ["VWAP_MEAN_REVERSION", "VWAP_BANDS"] and high >= row["vwap"]:
+                        exit_price = max(price, row["vwap"])
+                        exit_reason = "VWAP_MEDIAN_REVERSION_PROFIT"
+                        closed = True
 
                 if closed:
                     fee = (size * exit_price) * (req.fee_pct / 100.0)
@@ -354,6 +410,27 @@ class BacktestEngine:
 
                     alpha_score = tech_pts + vol_pts + deriv_pts + macro_pts
                     buy_signal = alpha_score >= 65 and (prev_row["macd_hist"] <= row["macd_hist"])
+
+                # ------------------ Strategy 7: Supertrend ATR Trend Follow ------------------
+                elif req.strategy in ["SUPERTREND_ATR", "SUPERTREND"]:
+                    st_flipped_bull = prev_row["supertrend_direction"] < 0 and row["supertrend_direction"] > 0
+                    st_trend_pullback = row["supertrend_direction"] > 0 and low <= row["st_lower"] * 1.01 and row["close"] > row["open"]
+                    buy_signal = (st_flipped_bull or st_trend_pullback) and (row["adx"] >= 18)
+
+                # ------------------ Strategy 8: Smart Money Concepts (FVG) ------------------
+                elif req.strategy in ["SMART_MONEY_FVG", "SMC_FVG"]:
+                    buy_signal = bool(row["bullish_fvg"]) and (row["rsi"] <= 65)
+
+                # ------------------ Strategy 9: Stochastic RSI Reversal ------------------
+                elif req.strategy in ["STOCH_RSI_CROSS", "STOCH_RSI"]:
+                    stoch_bull_cross = prev_row["stoch_k"] <= prev_row["stoch_d"] and row["stoch_k"] > row["stoch_d"]
+                    buy_signal = stoch_bull_cross and (row["stoch_k"] <= 40)
+
+                # ------------------ Strategy 10: VWAP Multi-Sigma Band Mean Reversion ------------------
+                elif req.strategy in ["VWAP_MEAN_REVERSION", "VWAP_BANDS"]:
+                    vwap_lower_touch = low <= row["vwap_lower"] or prev_row["low"] <= prev_row["vwap_lower"]
+                    bounce = row["close"] > row["open"]
+                    buy_signal = vwap_lower_touch and bounce and (row["rsi"] <= 45)
 
                 if buy_signal and cash > 50.0:
                     trade_alloc = cash * (req.position_size_pct / 100.0)

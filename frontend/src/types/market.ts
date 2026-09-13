@@ -78,11 +78,25 @@ export interface TechnicalIndicators {
   ema_20: number | null;
   ema_50: number | null;
   ema_200: number | null;
+  sma_20?: number | null;
+  sma_50?: number | null;
+  sma_200?: number | null;
   vwap: number | null;
+  vwap_upper_1?: number | null;
+  vwap_lower_1?: number | null;
   atr: number | null;
   bb_upper: number | null;
   bb_middle: number | null;
   bb_lower: number | null;
+  supertrend_value?: number | null;
+  supertrend_direction?: "BULLISH" | "BEARISH";
+  stoch_k?: number | null;
+  stoch_d?: number | null;
+  adx?: number | null;
+  adx_trend_strength?: "STRONG_TREND" | "TRENDING" | "RANGING_CHOP" | "WEAK";
+  fvg_detected?: boolean;
+  fvg_type?: "BULLISH_FVG" | "BEARISH_FVG" | "NONE";
+  fvg_price_level?: number | null;
   trend_state: "BULLISH" | "BEARISH" | "NEUTRAL";
   rsi_state: "OVERSOLD" | "OVERBOUGHT" | "NEUTRAL";
 }

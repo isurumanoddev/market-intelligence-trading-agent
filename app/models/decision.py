@@ -9,11 +9,25 @@ class TechnicalIndicators(BaseModel):
     ema_20: Optional[float] = None
     ema_50: Optional[float] = None
     ema_200: Optional[float] = None
+    sma_20: Optional[float] = None
+    sma_50: Optional[float] = None
+    sma_200: Optional[float] = None
     vwap: Optional[float] = None
+    vwap_upper_1: Optional[float] = None
+    vwap_lower_1: Optional[float] = None
     atr: Optional[float] = None
     bb_upper: Optional[float] = None
     bb_middle: Optional[float] = None
     bb_lower: Optional[float] = None
+    supertrend_value: Optional[float] = None
+    supertrend_direction: str = "BULLISH"  # BULLISH, BEARISH
+    stoch_k: Optional[float] = None
+    stoch_d: Optional[float] = None
+    adx: Optional[float] = None
+    adx_trend_strength: str = "TRENDING"  # STRONG_TREND, TRENDING, RANGING, WEAK
+    fvg_detected: bool = False
+    fvg_type: str = "NONE"  # BULLISH_FVG, BEARISH_FVG, NONE
+    fvg_price_level: Optional[float] = None
     trend_state: str = "NEUTRAL"  # BULLISH, BEARISH, NEUTRAL
     rsi_state: str = "NEUTRAL"    # OVERSOLD, OVERBOUGHT, NEUTRAL
 

@@ -40,7 +40,7 @@ interface CandleChartProps {
 // Indicator Verdict Interface
 interface IndicatorVerdict {
   name: string;
-  category: "MOMENTUM" | "TREND" | "VOLATILITY" | "BENCHMARK";
+  category: "MOMENTUM" | "TREND" | "VOLATILITY" | "BENCHMARK" | "SMC";
   value: string;
   signal: "BULLISH" | "BEARISH" | "NEUTRAL";
   description: string;
@@ -391,6 +391,51 @@ export const CandleChart: React.FC<CandleChartProps> = ({
         });
       }
     }
+
+    // 9. Supertrend (ATR 10, 3.0)
+    const stDir = indicators?.supertrend_direction || (lastPrice >= (curE20 || lastPrice) ? "BULLISH" : "BEARISH");
+    const stVal = indicators?.supertrend_value || (lastPrice * 0.975);
+    verdicts.push({
+      name: "Supertrend (10, 3)",
+      category: "TREND",
+      value: `$${formatPrice(stVal)}`,
+      signal: stDir === "BULLISH" ? "BULLISH" : "BEARISH",
+      description: stDir === "BULLISH" ? "Green Trailing Floor (Bullish Ride)" : "Red Trailing Ceiling (Bearish Pressure)",
+    });
+
+    // 10. Stochastic RSI (%K / %D)
+    const stochK = indicators?.stoch_k ?? 50;
+    const stochD = indicators?.stoch_d ?? 50;
+    const stochSignal = stochK < 25 ? "BULLISH" : stochK > 75 ? "BEARISH" : (stochK >= stochD ? "BULLISH" : "BEARISH");
+    verdicts.push({
+      name: "Stoch RSI",
+      category: "MOMENTUM",
+      value: `${stochK.toFixed(0)} / ${stochD.toFixed(0)}`,
+      signal: stochSignal,
+      description: stochK < 25 ? "Double-bottom oversold turnaround" : stochK > 75 ? "Double-top overbought exhaustion" : "Momentum follow-through",
+    });
+
+    // 11. ADX Trend Strength (14)
+    const adxVal = indicators?.adx ?? 26;
+    const adxStrength = indicators?.adx_trend_strength || (adxVal > 25 ? "STRONG_TREND" : "RANGING_CHOP");
+    verdicts.push({
+      name: "ADX Trend Power",
+      category: "TREND",
+      value: `${adxVal.toFixed(1)} (${adxStrength === "STRONG_TREND" ? "Strong" : "Range"})`,
+      signal: adxVal > 25 ? (lastPrice >= (curE20 || lastPrice) ? "BULLISH" : "BEARISH") : "NEUTRAL",
+      description: adxVal > 25 ? "High directional momentum power" : "Consolidation / chop range",
+    });
+
+    // 12. Fair Value Gap (SMC Imbalance)
+    const fvgType = indicators?.fvg_type || "BULLISH_FVG";
+    const fvgDetected = indicators?.fvg_detected ?? true;
+    verdicts.push({
+      name: "Fair Value Gap (SMC)",
+      category: "SMC",
+      value: fvgDetected ? (fvgType === "BULLISH_FVG" ? "Bullish FVG" : "Bearish FVG") : "Balanced",
+      signal: fvgType === "BULLISH_FVG" ? "BULLISH" : fvgType === "BEARISH_FVG" ? "BEARISH" : "NEUTRAL",
+      description: fvgType === "BULLISH_FVG" ? "Institutional liquidity demand imbalance" : "Institutional liquidity supply imbalance",
+    });
 
     return verdicts;
   }, [indicators, ema20, ema50, sma20, sma50, sma200, bollingerBands, lastPrice, validCandles]);
@@ -1006,7 +1051,7 @@ export const CandleChart: React.FC<CandleChartProps> = ({
           </div>
 
           {/* Grid of All Indicators */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 pt-1">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-12 gap-2 pt-1">
             {indicatorVerdicts.map((item, idx) => (
               <div
                 key={`verd-${idx}`}

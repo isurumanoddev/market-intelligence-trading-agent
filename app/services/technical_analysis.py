@@ -91,10 +91,90 @@ class TechnicalAnalysisService:
             tr_list.append(max(h_l, h_pc, l_pc))
         atr = float(np.mean(tr_list[-14:])) if len(tr_list) >= 14 else float(np.mean(tr_list)) if tr_list else (closes[-1] * 0.02)
 
-        # 6. VWAP
+        # 6. VWAP & Standard Deviation Bands
         typical_prices = (highs + lows + closes) / 3.0
         tot_vol = np.sum(volumes)
         vwap = float(np.sum(typical_prices * volumes) / tot_vol) if tot_vol > 0 else float(closes[-1])
+        vwap_dev = float(np.std(closes[-20:])) if n >= 20 else atr
+        vwap_upper_1 = vwap + (1.25 * vwap_dev)
+        vwap_lower_1 = vwap - (1.25 * vwap_dev)
+
+        # 7. SMAs (20, 50, 200)
+        sma_20 = float(np.mean(closes[-20:])) if n >= 20 else float(np.mean(closes))
+        sma_50 = float(np.mean(closes[-50:])) if n >= 50 else float(np.mean(closes))
+        sma_200 = float(np.mean(closes[-200:])) if n >= 200 else None
+
+        # 8. Supertrend (ATR 10, Multiplier 3.0)
+        st_period = min(10, n)
+        st_atr = float(np.mean(tr_list[-st_period:])) if len(tr_list) >= st_period else atr
+        hl2 = (highs[-1] + lows[-1]) / 2.0
+        basic_upper = hl2 + (3.0 * st_atr)
+        basic_lower = hl2 - (3.0 * st_atr)
+        supertrend_direction = "BULLISH" if closes[-1] >= basic_lower else "BEARISH"
+        supertrend_val = basic_lower if supertrend_direction == "BULLISH" else basic_upper
+
+        # 9. Stochastic RSI (14, 14, 3, 3)
+        rsi_series = []
+        for i in range(max(14, n - 20), n + 1):
+            sub_delta = np.diff(closes[:i])
+            if len(sub_delta) >= 14:
+                sub_g = np.where(sub_delta > 0, sub_delta, 0.0)
+                sub_l = np.where(sub_delta < 0, -sub_delta, 0.0)
+                ag = np.mean(sub_g[-14:])
+                al = np.mean(sub_l[-14:])
+                sub_rs = (ag / al) if al > 0 else 100.0
+                sub_rsi = 100.0 - (100.0 / (1.0 + sub_rs)) if al > 0 else 100.0
+                rsi_series.append(sub_rsi)
+            else:
+                rsi_series.append(50.0)
+
+        if len(rsi_series) >= 5:
+            min_rsi = min(rsi_series[-14:])
+            max_rsi = max(rsi_series[-14:])
+            stoch_k = ((rsi_series[-1] - min_rsi) / (max_rsi - min_rsi + 1e-9)) * 100.0 if max_rsi > min_rsi else 50.0
+            stoch_d = float(np.mean([((r - min_rsi) / (max_rsi - min_rsi + 1e-9) * 100.0) if max_rsi > min_rsi else 50.0 for r in rsi_series[-3:]])) if len(rsi_series) >= 3 else stoch_k
+        else:
+            stoch_k = 50.0
+            stoch_d = 50.0
+
+        # 10. ADX (Average Directional Index 14)
+        plus_dm = []
+        minus_dm = []
+        for i in range(1, n):
+            up_move = highs[i] - highs[i - 1]
+            down_move = lows[i - 1] - lows[i]
+            plus_dm.append(up_move if up_move > down_move and up_move > 0 else 0.0)
+            minus_dm.append(down_move if down_move > up_move and down_move > 0 else 0.0)
+
+        if len(plus_dm) >= 14:
+            p_dm14 = np.mean(plus_dm[-14:])
+            m_dm14 = np.mean(minus_dm[-14:])
+            atr14 = atr if atr > 0 else 1.0
+            p_di = (p_dm14 / atr14) * 100.0
+            m_di = (m_dm14 / atr14) * 100.0
+            dx = (abs(p_di - m_di) / (p_di + m_di + 1e-9)) * 100.0
+            adx = float(dx)
+        else:
+            adx = 24.0
+
+        adx_strength = "STRONG_TREND" if adx > 28 else "TRENDING" if adx > 20 else "RANGING_CHOP"
+
+        # 11. Fair Value Gap (FVG) / Smart Money Concepts Imbalance
+        fvg_detected = False
+        fvg_type = "NONE"
+        fvg_price_level = None
+
+        if n >= 4:
+            c_prev2 = candles[-3]
+            c_curr = candles[-1]
+            if c_curr.low > c_prev2.high:
+                fvg_detected = True
+                fvg_type = "BULLISH_FVG"
+                fvg_price_level = round((c_curr.low + c_prev2.high) / 2.0, 2)
+            elif c_curr.high < c_prev2.low:
+                fvg_detected = True
+                fvg_type = "BEARISH_FVG"
+                fvg_price_level = round((c_curr.high + c_prev2.low) / 2.0, 2)
 
         # States
         last_close = closes[-1]
@@ -124,11 +204,25 @@ class TechnicalAnalysisService:
             ema_20=round(ema_20, 2) if ema_20 else None,
             ema_50=round(ema_50, 2) if ema_50 else None,
             ema_200=round(ema_200, 2) if ema_200 else None,
+            sma_20=round(sma_20, 2) if sma_20 else None,
+            sma_50=round(sma_50, 2) if sma_50 else None,
+            sma_200=round(sma_200, 2) if sma_200 else None,
             vwap=round(vwap, 2),
+            vwap_upper_1=round(vwap_upper_1, 2),
+            vwap_lower_1=round(vwap_lower_1, 2),
             atr=round(atr, 4),
             bb_upper=round(bb_upper, 2),
             bb_middle=round(bb_mid, 2),
             bb_lower=round(bb_lower, 2),
+            supertrend_value=round(supertrend_val, 2),
+            supertrend_direction=supertrend_direction,
+            stoch_k=round(float(stoch_k), 2),
+            stoch_d=round(float(stoch_d), 2),
+            adx=round(float(adx), 2),
+            adx_trend_strength=adx_strength,
+            fvg_detected=fvg_detected,
+            fvg_type=fvg_type,
+            fvg_price_level=fvg_price_level,
             trend_state=trend_state,
             rsi_state=rsi_state
         )

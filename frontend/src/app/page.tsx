@@ -69,7 +69,7 @@ export default function DashboardPage() {
   const [currentSymbol, setCurrentSymbol] = useState("BTC/USDT");
   const [currentTimeframe, setCurrentTimeframe] = useState("1h");
   const [activeChartView, setActiveChartView] = useState<"AI_QUANT" | "TRADINGVIEW">("AI_QUANT");
-  const [isChartWide, setIsChartWide] = useState(false);
+  const [isChartWide, setIsChartWide] = useState(true);
   const [refreshInterval, setRefreshInterval] = useState(10000);
   const [centerTab, setCenterTab] = useState<"book" | "tape">("book");
 
@@ -408,8 +408,8 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Center Column: Order Book Depth Ladder & Trade Tape (3 cols) */}
-        <div className="lg:col-span-3 bg-[#0c101d] border border-slate-800/90 rounded-lg flex flex-col overflow-hidden shadow-xl">
+        {/* Center Column: Order Book Depth Ladder & Trade Tape (3 cols, or 4 cols in wide view) */}
+        <div className={`${isChartWide ? "lg:col-span-4" : "lg:col-span-3"} bg-[#0c101d] border border-slate-800/90 rounded-lg flex flex-col overflow-hidden shadow-xl transition-all duration-300`}>
           {/* Pro Tab Switcher */}
           <div className="flex border-b border-slate-800/80 bg-[#080d1a]">
             <button
@@ -447,8 +447,8 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Right Column: AI Master Decision Arbiter & Macro News Intelligence (4 cols) */}
-        <div className="lg:col-span-4 flex flex-col gap-3">
+        {/* Right Column: AI Master Decision Arbiter & Macro News Intelligence (4 cols, or 12 cols 2-grid in wide view) */}
+        <div className={`${isChartWide ? "lg:col-span-12 grid grid-cols-1 md:grid-cols-2 gap-3" : "lg:col-span-4 flex flex-col gap-3"} transition-all duration-300`}>
           <DecisionCard
             decision={analysis?.decision || null}
             onExecuteTrade={handleExecuteTrade}
