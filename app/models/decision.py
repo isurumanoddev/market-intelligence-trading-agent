@@ -161,3 +161,30 @@ class PortfolioState(BaseModel):
     open_positions_count: int
     positions: List[PaperPosition] = []
     trades_history: List[PaperTradeRecord] = []
+
+class LLMHorizonPrediction(BaseModel):
+    horizon: str  # "30m", "1h", "4h", "1d"
+    horizon_label: str  # "30 Minutes", "1 Hour", "4 Hours", "1 Day"
+    predicted_price: float
+    expected_change_pct: float = 0.0
+    direction: str = "NEUTRAL"  # BULLISH / BEARISH / NEUTRAL
+    confidence: int = 70  # 0 to 100
+    price_range_low: float = 0.0
+    price_range_high: float = 0.0
+    reasoning: str = ""
+    key_factors: List[str] = []
+    risk_level: str = "MEDIUM"  # LOW / MEDIUM / HIGH / EXTREME
+    recommended_action: str = "HOLD"  # BUY / SELL / HOLD / WAIT
+
+class LLMPredictionResult(BaseModel):
+    symbol: str
+    current_price: float
+    timestamp: str = ""
+    model_used: str = "Google Gemini 3.7 Flash Reasoning Engine"
+    market_summary: str = ""
+    overall_bias: str = "NEUTRAL"  # BULLISH / BEARISH / NEUTRAL
+    overall_confidence: int = 70
+    predictions: List[LLMHorizonPrediction] = []
+    context_used: Dict[str, Any] = {}
+    generation_time_ms: int = 0
+

@@ -364,8 +364,168 @@ export interface SettingsData {
   gemini_key_masked: string;
   has_coinglass_key?: boolean;
   coinglass_key_masked?: string;
+  has_telegram?: boolean;
+  telegram_chat_id_masked?: string;
   default_exchange: string;
   default_symbols: string[];
   max_risk_per_trade_pct: number;
   max_spread_pct: number;
 }
+
+export interface BacktestRequest {
+  symbol: string;
+  strategy: 
+    | "EMA_RSI" 
+    | "MACD" 
+    | "BOLLINGER_REVERSION" 
+    | "DERIVATIVES_SQUEEZE" 
+    | "NEWS_MACRO_MOMENTUM" 
+    | "QUANT_ALPHA_CONFLUENCE"
+    | "CONFLUENCE";
+  timeframe: string;
+  lookback_days: number;
+  initial_capital: number;
+  position_size_pct: number;
+  stop_loss_pct: number;
+  take_profit_pct: number;
+  trailing_stop_pct: number;
+  fee_pct: number;
+}
+
+export interface BacktestTrade {
+  id: string;
+  symbol: string;
+  side: string;
+  entry_time: string;
+  exit_time: string;
+  entry_price: number;
+  exit_price: number;
+  size: number;
+  pnl: number;
+  pnl_pct: number;
+  exit_reason: string;
+}
+
+export interface EquityPoint {
+  timestamp: string;
+  equity: number;
+  drawdown_pct: number;
+  price: number;
+}
+
+export interface BacktestMetrics {
+  initial_capital: number;
+  final_equity: number;
+  net_profit_usd: number;
+  net_profit_pct: number;
+  total_trades: number;
+  winning_trades: number;
+  losing_trades: number;
+  win_rate_pct: number;
+  profit_factor: number;
+  max_drawdown_pct: number;
+  sharpe_ratio: number;
+  sortino_ratio: number;
+  avg_trade_pnl_usd: number;
+  avg_trade_pnl_pct: number;
+  max_consecutive_wins: number;
+  max_consecutive_losses: number;
+  benchmark_return_pct: number;
+}
+
+export interface BacktestResult {
+  parameters: Record<string, any>;
+  metrics: BacktestMetrics;
+  equity_curve: EquityPoint[];
+  trades: BacktestTrade[];
+}
+
+export interface BotConfig {
+  enabled: boolean;
+  mode: "PAPER" | "LIVE";
+  symbols: string[];
+  strategy: string;
+  min_conviction: number;
+  trade_size_usd: number;
+  max_open_positions: number;
+  auto_sl_tp: boolean;
+  stop_loss_pct: number;
+  take_profit_pct: number;
+  trailing_stop_enabled: boolean;
+  trailing_stop_pct: number;
+  max_daily_loss_usd: number;
+  cooldown_seconds: number;
+  poll_interval_seconds: number;
+}
+
+export interface BotStats {
+  status: "STOPPED" | "RUNNING" | "PAUSED";
+  uptime_seconds: number;
+  total_trades: number;
+  winning_trades: number;
+  losing_trades: number;
+  win_rate_pct: number;
+  total_realized_pnl: number;
+  profit_factor: number;
+  active_positions_count: number;
+  last_eval_time: string;
+  daily_drawdown_usd: number;
+  circuit_breaker_triggered: boolean;
+}
+
+export interface BotLogEntry {
+  id: string;
+  timestamp: string;
+  level: "INFO" | "SIGNAL" | "TRADE" | "RISK" | "WARNING" | "ERROR";
+  symbol?: string | null;
+  message: string;
+  details?: Record<string, any> | null;
+}
+
+export interface MacroTelemetry {
+  funding_rate_pct?: number;
+  funding_bias?: string;
+  open_interest_usd?: number;
+  stablecoin_flow_signal?: string;
+  stablecoin_30d_change_usd?: number;
+  total_defi_tvl_usd?: number;
+  news_sentiment_score?: number;
+  news_sentiment_label?: string;
+  top_catalyst?: string;
+}
+
+export interface BotStatusResponse {
+  config: BotConfig;
+  stats: BotStats;
+  macro_telemetry?: MacroTelemetry;
+  recent_logs: BotLogEntry[];
+}
+
+export interface LLMHorizonPrediction {
+  horizon: "30m" | "1h" | "4h" | "1d" | string;
+  horizon_label: string;
+  predicted_price: number;
+  expected_change_pct: number;
+  direction: "BULLISH" | "BEARISH" | "NEUTRAL";
+  confidence: number;
+  price_range_low: number;
+  price_range_high: number;
+  reasoning: string;
+  key_factors: string[];
+  risk_level: "LOW" | "MEDIUM" | "HIGH" | "EXTREME" | string;
+  recommended_action: "BUY" | "SELL" | "HOLD" | "WAIT" | string;
+}
+
+export interface LLMPredictionResult {
+  symbol: string;
+  current_price: number;
+  timestamp: string;
+  model_used: string;
+  market_summary: string;
+  overall_bias: "BULLISH" | "BEARISH" | "NEUTRAL";
+  overall_confidence: number;
+  predictions: LLMHorizonPrediction[];
+  context_used?: Record<string, any>;
+  generation_time_ms: number;
+}
+

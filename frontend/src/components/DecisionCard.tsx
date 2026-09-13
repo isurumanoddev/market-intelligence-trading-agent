@@ -23,8 +23,29 @@ export const DecisionCard: React.FC<DecisionCardProps> = ({
 
   if (!decision) {
     return (
-      <div className="bg-[#111622] border border-slate-800 rounded p-4 text-xs font-mono text-slate-500">
-        Synthesizing market signals...
+      <div className="bg-[#0e1424] border border-slate-800/90 rounded-lg p-4 shadow-xl flex flex-col gap-3 font-mono">
+        <div className="flex justify-between items-center text-[10px] text-slate-400 font-bold border-b border-slate-800/80 pb-2">
+          <span className="flex items-center gap-1.5 text-cyan-400">
+            <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+            AI MASTER TRADING ARBITER
+          </span>
+          <span className="text-slate-500">QUANT-SYNTHESIS</span>
+        </div>
+        <div className="flex items-center gap-4 py-2">
+          <div className="h-8 w-28 bg-slate-800/70 rounded-md animate-pulse" />
+          <div className="flex-1 space-y-2">
+            <div className="flex justify-between">
+              <div className="h-3 w-20 bg-slate-800/60 rounded animate-pulse" />
+              <div className="h-3 w-10 bg-slate-800/60 rounded animate-pulse" />
+            </div>
+            <div className="h-2 w-full bg-slate-800/80 rounded-full animate-pulse" />
+          </div>
+        </div>
+        <div className="grid grid-cols-3 gap-2 py-1">
+          <div className="h-10 bg-slate-800/50 rounded animate-pulse" />
+          <div className="h-10 bg-slate-800/50 rounded animate-pulse" />
+          <div className="h-10 bg-slate-800/50 rounded animate-pulse" />
+        </div>
       </div>
     );
   }

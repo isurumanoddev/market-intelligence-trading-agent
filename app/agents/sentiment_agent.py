@@ -28,7 +28,7 @@ CATALYST_KEYWORDS = {
 
 class SentimentAgent:
     def __init__(self):
-        self.model_name = "gemini-2.5-flash"
+        self.model_name = "gemini-3.7-flash"
 
     def analyze(self, symbol: str, news_items: List[NewsItem]) -> Tuple[SentimentMetrics, List[NewsItem]]:
         if not news_items:
@@ -99,15 +99,38 @@ News items:
             "required": ["overall_sentiment_score", "overall_sentiment_label", "dominant_narrative", "top_catalysts", "item_evaluations"]
         }
 
-        response = client.models.generate_content(
-            model=self.model_name,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                response_json_schema=schema,
-                temperature=0.2
+        model_to_use = self.model_name
+        response = None
+        system_instruction = "You are a senior financial sentiment analyst. Evaluate financial news articles with high precision and provide structured sentiment metrics."
+        try:
+            response = client.models.generate_content(
+                model=model_to_use,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    system_instruction=system_instruction,
+                    response_mime_type="application/json",
+                    response_json_schema=schema,
+                    temperature=0.2
+                )
             )
-        )
+        except Exception as e:
+            if "3.7" in model_to_use:
+                model_to_use = "gemini-2.5-flash"
+                response = client.models.generate_content(
+                    model=model_to_use,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        system_instruction=system_instruction,
+                        response_mime_type="application/json",
+                        response_json_schema=schema,
+                        temperature=0.2
+                    )
+                )
+            else:
+                raise e
+
+        if not response or not response.text:
+            raise ValueError("Empty Gemini response")
 
         data = json.loads(response.text)
         eval_map = {item["id"]: item for item in data.get("item_evaluations", [])}

@@ -14,7 +14,7 @@ from app.config import settings
 
 class ForecastingService:
     def __init__(self):
-        self.model_name = "gemini-2.5-flash"
+        self.model_name = "gemini-3.7-flash"
 
     def generate_forecast(
         self,
@@ -620,15 +620,38 @@ Provide realistic targets for 1m, 5m, 10m, 30m, 1h, 4h, 1d, 7d, and 30d, plus ov
             "required": ["target_7d", "target_30d", "forecast_bias", "confidence_score", "rationale"]
         }
 
-        response = client.models.generate_content(
-            model=self.model_name,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                response_json_schema=schema,
-                temperature=0.1
+        model_to_use = self.model_name
+        response = None
+        try:
+            response = client.models.generate_content(
+                model=model_to_use,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    system_instruction="You are the Lead Quantitative Forecaster and Multi-Asset Portfolio Strategist.",
+                    response_mime_type="application/json",
+                    response_json_schema=schema,
+                    temperature=0.1
+                )
             )
-        )
+        except Exception as e:
+            if "3.7" in model_to_use:
+                model_to_use = "gemini-2.5-flash"
+                response = client.models.generate_content(
+                    model=model_to_use,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        system_instruction="You are the Lead Quantitative Forecaster and Multi-Asset Portfolio Strategist.",
+                        response_mime_type="application/json",
+                        response_json_schema=schema,
+                        temperature=0.1
+                    )
+                )
+            else:
+                raise e
+
+        if not response or not response.text:
+            raise ValueError("Empty Gemini response")
+
         return json.loads(response.text)
 
     def _align_deterministic(
