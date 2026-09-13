@@ -207,27 +207,37 @@ export default function DashboardPage() {
     return () => clearInterval(interval);
   }, []);
 
-  // Execute Paper Trade
-  const handleExecuteTrade = async () => {
-    if (!analysis || !analysis.decision) return;
+  // Execute Paper Trade (supports DecisionCard & In-Chart Signals)
+  const handleExecuteTrade = async (
+    customSide?: "BUY" | "SELL",
+    customEntry?: number,
+    customSl?: number,
+    customTp?: number
+  ) => {
+    if (!analysis) return;
     const dec = analysis.decision;
-    const side = dec.action.includes("SELL") ? "SELL" : "BUY";
+    const currentP = customEntry || dec?.current_price || analysis.ticker?.price || 70000;
+    const side = customSide || (dec?.action.includes("SELL") ? "SELL" : "BUY");
+    const sl = customSl !== undefined ? customSl : dec?.stop_loss;
+    const tp = customTp !== undefined ? customTp : dec?.take_profit_1;
     const tradeValue = 5000.0;
-    const amount = Number((tradeValue / dec.current_price).toFixed(6));
+    const amount = Number((tradeValue / currentP).toFixed(6));
 
     setIsExecutingTrade(true);
     try {
       await executeTrade({
         symbol: currentSymbol,
         side,
-        price: dec.current_price,
+        price: currentP,
         amount,
-        stop_loss: dec.stop_loss,
-        take_profit: dec.take_profit_1,
-        reason: `AI ${dec.action} (${dec.conviction}% Conviction)`,
+        stop_loss: sl,
+        take_profit: tp,
+        reason: customSide
+          ? `Chart ${customSide} Signal (TP: $${tp?.toFixed(2)} | SL: $${sl?.toFixed(2)})`
+          : `AI ${dec?.action} (${dec?.conviction}% Conviction)`,
       });
       await loadPortfolioData();
-      alert(`Executed ${side} ${amount} ${currentSymbol} at $${dec.current_price}!`);
+      alert(`Executed ${side} ${amount} ${currentSymbol} at $${currentP}!`);
     } catch (err: any) {
       alert("Trade execution error: " + err.message);
     } finally {
@@ -327,10 +337,13 @@ export default function DashboardPage() {
             candles={candles}
             indicators={analysis?.indicators || null}
             forecast={analysis?.price_forecast || null}
+            decision={analysis?.decision || null}
             currentTimeframe={currentTimeframe}
             onChangeTimeframe={handleTimeframeChange}
             exchange={analysis?.ticker?.exchange || "KRAKEN"}
             isLoading={isCandlesLoading}
+            onExecuteTrade={handleExecuteTrade}
+            isExecutingTrade={isExecutingTrade}
           />
         </div>
 
