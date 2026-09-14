@@ -15,9 +15,14 @@ import {
   Scale,
   Percent,
   CheckCircle2,
-  AlertTriangle
+  AlertTriangle,
+  Award,
+  Copy,
+  Check,
+  Globe,
+  Radio
 } from "lucide-react";
-import { PortfolioState } from "@/types/market";
+import { PortfolioState, AccuracySetupRating } from "@/types/market";
 
 interface PaperTradeModalProps {
   isOpen: boolean;
@@ -29,6 +34,7 @@ interface PaperTradeModalProps {
   initialSl?: number;
   initialTp?: number;
   initialLeverage?: number;
+  accuracyRating?: AccuracySetupRating | null;
   portfolio: PortfolioState | null;
   onExecute: (payload: {
     symbol: string;
@@ -38,6 +44,7 @@ interface PaperTradeModalProps {
     leverage: number;
     stop_loss?: number;
     take_profit?: number;
+    broker_type?: string;
     reason?: string;
   }) => Promise<void>;
 }
@@ -54,6 +61,7 @@ export const PaperTradeModal: React.FC<PaperTradeModalProps> = ({
   initialSl,
   initialTp,
   initialLeverage = 5,
+  accuracyRating = null,
   portfolio,
   onExecute,
 }) => {
@@ -62,6 +70,7 @@ export const PaperTradeModal: React.FC<PaperTradeModalProps> = ({
   const [orderType, setOrderType] = useState<"MARKET" | "LIMIT">("MARKET");
   const [limitPrice, setLimitPrice] = useState<number>(initialCurrentPrice || 80000);
   
+  const [brokerType, setBrokerType] = useState<"LOCAL" | "BINANCE_TESTNET" | "BYBIT_TESTNET">("LOCAL");
   const [sizeUsd, setSizeUsd] = useState<number>(5000);
   const [leverage, setLeverage] = useState<number>(initialLeverage || 5);
   
@@ -69,6 +78,10 @@ export const PaperTradeModal: React.FC<PaperTradeModalProps> = ({
   const [tpPrice, setTpPrice] = useState<number>(0);
   const [enableSl, setEnableSl] = useState<boolean>(true);
   const [slPrice, setSlPrice] = useState<number>(0);
+
+  const [showWebhook, setShowWebhook] = useState<boolean>(false);
+  const [copiedWebhook, setCopiedWebhook] = useState<boolean>(false);
+  const [copiedPine, setCopiedPine] = useState<boolean>(false);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -167,8 +180,44 @@ export const PaperTradeModal: React.FC<PaperTradeModalProps> = ({
 
   if (!isOpen) return null;
 
-  const tvCleanSymbol = symbol.replace("/", "");
-  const tvWebUrl = `https://www.tradingview.com/chart/?symbol=BINANCE:${tvCleanSymbol}`;
+  const cleanSymbol = symbol.replace("/", "").toUpperCase();
+  const tvWebUrl = `https://www.tradingview.com/chart/?symbol=BINANCE:${cleanSymbol}`;
+  const binanceTestnetUrl = `https://testnet.binancefuture.com/en/futures/${cleanSymbol}`;
+  const bybitTestnetUrl = `https://testnet.bybit.com/trade/usdt/${cleanSymbol}`;
+
+  const currentWatchUrl = brokerType === "BINANCE_TESTNET"
+    ? binanceTestnetUrl
+    : brokerType === "BYBIT_TESTNET"
+    ? bybitTestnetUrl
+    : tvWebUrl;
+
+  const webhookJsonSnippet = JSON.stringify({
+    message_type: "ORDER",
+    ticker: cleanSymbol,
+    action: side === "BUY" ? "buy" : "sell",
+    order_type: "market",
+    price: calculations.entry,
+    quantity: calculations.amount,
+    leverage: leverage,
+    stop_loss: enableSl ? slPrice : null,
+    take_profit: enableTp ? tpPrice : null,
+    comment: `AI Quant Signal (${brokerType})`,
+    timestamp: "{{timenow}}"
+  }, null, 2);
+
+  const pineSyntaxSnippet = `LICENSE_ID,${side === "BUY" ? "buy" : "sell"},${cleanSymbol},vol=${calculations.amount}${enableSl ? `,sl=${slPrice}` : ""}${enableTp ? `,tp=${tpPrice}` : ""}`;
+
+  const handleCopyWebhook = () => {
+    navigator.clipboard.writeText(webhookJsonSnippet);
+    setCopiedWebhook(true);
+    setTimeout(() => setCopiedWebhook(false), 2000);
+  };
+
+  const handleCopyPine = () => {
+    navigator.clipboard.writeText(pineSyntaxSnippet);
+    setCopiedPine(true);
+    setTimeout(() => setCopiedPine(false), 2000);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -211,7 +260,8 @@ export const PaperTradeModal: React.FC<PaperTradeModalProps> = ({
         leverage,
         stop_loss: enableSl ? slPrice : undefined,
         take_profit: enableTp ? tpPrice : undefined,
-        reason: `${side} ${leverage}x (${orderType}) — TP: $${tpPrice || "None"} | SL: $${slPrice || "None"}`,
+        broker_type: brokerType,
+        reason: `${side} ${leverage}x (${orderType} via ${brokerType}) — TP: $${tpPrice || "None"} | SL: $${slPrice || "None"}`,
       });
       onClose();
     } catch (err: any) {
@@ -226,7 +276,7 @@ export const PaperTradeModal: React.FC<PaperTradeModalProps> = ({
       <div className="relative w-full max-w-lg bg-[#0a0f1d] border border-cyan-500/40 rounded-xl shadow-2xl shadow-cyan-950/60 overflow-hidden flex flex-col font-mono text-xs">
         
         {/* Modal Header */}
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-800 bg-[#0c1224]">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-slate-800 bg-[#0c1224]">
           <div className="flex items-center gap-2.5">
             <div className={`p-1.5 rounded-lg border ${
               side === "BUY"
@@ -243,21 +293,21 @@ export const PaperTradeModal: React.FC<PaperTradeModalProps> = ({
                 </span>
               </div>
               <p className="text-[10px] text-slate-400 font-sans">
-                Simulated institutional execution with real-time margin & PnL
+                Persistent local sandbox with live exchange testnet routing
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
             <a
-              href={tvWebUrl}
+              href={currentWatchUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-slate-400 hover:text-cyan-400 px-2 py-1 rounded bg-slate-900 border border-slate-700/80 hover:bg-slate-800 transition-colors flex items-center gap-1 text-[10px]"
-              title="Open TradingView.com Paper Trading"
+              className="text-slate-400 hover:text-cyan-300 px-2 py-1 rounded bg-slate-900 border border-slate-700/80 hover:bg-slate-800 transition-colors flex items-center gap-1 text-[10px]"
+              title="Watch on Live Exchange / TradingView"
             >
               <ExternalLink className="w-3 h-3 text-cyan-400" />
-              <span>TV Paper</span>
+              <span>Watch Live</span>
             </a>
             <button
               onClick={onClose}
@@ -268,9 +318,85 @@ export const PaperTradeModal: React.FC<PaperTradeModalProps> = ({
           </div>
         </div>
 
+        {/* Institutional Grade & Win Expectancy Ribbon */}
+        {accuracyRating && (
+          <div className="bg-[#0b172a] border-b border-slate-800 px-4 py-1.5 flex items-center justify-between text-[11px]">
+            <div className="flex items-center gap-2">
+              <span className={`px-2 py-0.5 rounded font-black text-[10px] flex items-center gap-1 border ${
+                accuracyRating.grade === "A+"
+                  ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/50 shadow-sm shadow-emerald-950"
+                  : accuracyRating.grade === "A"
+                  ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/50 shadow-sm"
+                  : "bg-amber-500/20 text-amber-300 border-amber-500/50"
+              }`}>
+                <Award className="w-3 h-3" />
+                <span>SETUP: GRADE {accuracyRating.grade}</span>
+              </span>
+              <span className="text-slate-300 font-bold">
+                Win Expectancy: <span className="text-emerald-400">{accuracyRating.win_rate_expectancy}%</span>
+              </span>
+            </div>
+            <span className="text-[10px] text-slate-400 font-sans hidden sm:inline">
+              MTF: <span className="text-cyan-300 font-mono font-bold">{accuracyRating.mtf_score}/4 Aligned</span>
+            </span>
+          </div>
+        )}
+
         {/* Modal Form */}
-        <form onSubmit={handleSubmit} className="p-5 space-y-4 overflow-y-auto max-h-[80vh]">
+        <form onSubmit={handleSubmit} className="p-4 space-y-3.5 overflow-y-auto max-h-[78vh]">
           
+          {/* Broker Destination Selector */}
+          <div className="space-y-1">
+            <div className="flex justify-between items-center text-[10px]">
+              <span className="text-slate-400 font-semibold flex items-center gap-1">
+                <Globe className="w-3 h-3 text-cyan-400" />
+                EXECUTION BROKER ENGINE
+              </span>
+              <span className="text-[9px] text-slate-500">Auto-saved to disk</span>
+            </div>
+
+            <div className="grid grid-cols-3 gap-1.5">
+              <button
+                type="button"
+                onClick={() => setBrokerType("LOCAL")}
+                className={`py-1.5 px-2 rounded-lg border text-left flex flex-col transition-all ${
+                  brokerType === "LOCAL"
+                    ? "bg-blue-600/25 border-blue-500 text-white shadow-md shadow-blue-950/50"
+                    : "bg-slate-900/70 border-slate-800 text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                <span className="font-bold text-[10px] text-blue-300">Local Sandbox</span>
+                <span className="text-[8px] text-slate-400">$100k Margin</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setBrokerType("BINANCE_TESTNET")}
+                className={`py-1.5 px-2 rounded-lg border text-left flex flex-col transition-all ${
+                  brokerType === "BINANCE_TESTNET"
+                    ? "bg-amber-600/25 border-amber-500 text-white shadow-md shadow-amber-950/50"
+                    : "bg-slate-900/70 border-slate-800 text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                <span className="font-bold text-[10px] text-amber-300">Binance Testnet</span>
+                <span className="text-[8px] text-slate-400">Live Orderbook</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setBrokerType("BYBIT_TESTNET")}
+                className={`py-1.5 px-2 rounded-lg border text-left flex flex-col transition-all ${
+                  brokerType === "BYBIT_TESTNET"
+                    ? "bg-purple-600/25 border-purple-500 text-white shadow-md shadow-purple-950/50"
+                    : "bg-slate-900/70 border-slate-800 text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                <span className="font-bold text-[10px] text-purple-300">Bybit Demo</span>
+                <span className="text-[8px] text-slate-400">Live Contracts</span>
+              </button>
+            </div>
+          </div>
+
           {/* Symbol & Price Banner */}
           <div className="flex items-center justify-between bg-slate-900/90 border border-slate-800 p-2.5 rounded-lg">
             <div className="flex items-center gap-2">
@@ -386,7 +512,6 @@ export const PaperTradeModal: React.FC<PaperTradeModalProps> = ({
               />
             </div>
 
-            {/* Quick Size Preset Buttons */}
             <div className="flex items-center gap-1.5 pt-0.5">
               {[1000, 2500, 5000, 10000].map((amt) => (
                 <button
@@ -475,7 +600,6 @@ export const PaperTradeModal: React.FC<PaperTradeModalProps> = ({
 
           {/* Take Profit (TP) & Stop Loss (SL) */}
           <div className="grid grid-cols-2 gap-3">
-            {/* Take Profit Card */}
             <div className="space-y-1 bg-[#071317] border border-emerald-500/30 p-2.5 rounded-lg">
               <div className="flex items-center justify-between">
                 <label className="text-[10px] text-emerald-400 font-bold flex items-center gap-1">
@@ -507,7 +631,6 @@ export const PaperTradeModal: React.FC<PaperTradeModalProps> = ({
               )}
             </div>
 
-            {/* Stop Loss Card */}
             <div className="space-y-1 bg-[#18090f] border border-rose-500/30 p-2.5 rounded-lg">
               <div className="flex items-center justify-between">
                 <label className="text-[10px] text-rose-400 font-bold flex items-center gap-1">
@@ -553,19 +676,21 @@ export const PaperTradeModal: React.FC<PaperTradeModalProps> = ({
             </div>
 
             <div className="flex justify-between text-slate-400">
-              <span>Est. Taker Fee (0.05%):</span>
-              <span className="text-slate-300">${calculations.feeEst}</span>
+              <span>Execution Route:</span>
+              <span className="text-amber-400 font-bold">
+                {brokerType === "BINANCE_TESTNET" ? "Binance Futures Testnet (Real Demo)" : brokerType === "BYBIT_TESTNET" ? "Bybit Demo Contracts" : "Local Disk-Persistent Sandbox"}
+              </span>
             </div>
 
             <div className="flex justify-between text-slate-400">
-              <span>Available Cash Balance:</span>
+              <span>Available Cash:</span>
               <span className="text-slate-300">${availableCash.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
             </div>
 
             {calculations.riskReward > 0 && (
               <div className="flex justify-between text-slate-300 border-t border-slate-800 pt-1">
-                <span>Calculated Risk-to-Reward:</span>
-                <span className="text-amber-400 font-bold">1 : {calculations.riskReward}</span>
+                <span>Risk-to-Reward:</span>
+                <span className="text-emerald-400 font-bold">1 : {calculations.riskReward}</span>
               </div>
             )}
           </div>
@@ -596,26 +721,69 @@ export const PaperTradeModal: React.FC<PaperTradeModalProps> = ({
             </span>
           </button>
 
-          {/* TradingView Native Paper Trading Integration Callout */}
-          <div className="bg-[#0b1324] border border-blue-500/30 rounded-lg p-3 space-y-2 text-[11px] font-sans">
-            <div className="flex items-center justify-between font-mono">
-              <span className="text-blue-300 font-bold flex items-center gap-1.5">
-                <ExternalLink className="w-3.5 h-3.5 text-blue-400" />
-                Want to paper trade on TradingView.com?
-              </span>
-              <a
-                href={tvWebUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs text-cyan-400 hover:text-cyan-300 underline font-bold flex items-center gap-1"
+          {/* Live Watch Link Callout */}
+          <div className="flex items-center justify-between bg-cyan-950/20 border border-cyan-500/30 px-3 py-2 rounded-lg text-[10px]">
+            <span className="text-slate-300">
+              Watch this position on: <strong className="text-white">{brokerType === "BINANCE_TESTNET" ? "Binance Testnet" : brokerType === "BYBIT_TESTNET" ? "Bybit Demo" : "TradingView.com"}</strong>
+            </span>
+            <a
+              href={currentWatchUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-cyan-400 hover:text-cyan-300 font-bold underline flex items-center gap-1"
+            >
+              <span>Launch</span>
+              <ExternalLink className="w-2.5 h-2.5" />
+            </a>
+          </div>
+
+          {/* TradingView Webhook / PineConnector Alert Automation Drawer */}
+          <div className="bg-[#0b1324] border border-blue-500/30 rounded-lg p-2.5 space-y-2 text-[10px]">
+            <div className="flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => setShowWebhook(!showWebhook)}
+                className="text-blue-300 font-bold flex items-center gap-1.5 hover:text-blue-200"
               >
-                <span>Launch TV</span>
-                <ExternalLink className="w-3 h-3" />
-              </a>
+                <Radio className="w-3.5 h-3.5 text-blue-400" />
+                <span>TradingView Webhook & PineConnector Snippet</span>
+                <span className="text-[9px] text-slate-500">({showWebhook ? "Hide" : "Show"})</span>
+              </button>
             </div>
-            <p className="text-slate-400 text-[10px] leading-relaxed">
-              TradingView prevents third-party embedded charts from directly executing trades into private user accounts due to cross-origin authentication security. You can execute high-frequency paper orders with leverage and SL/TP using our terminal's built-in simulator above, or click <strong className="text-white">Launch TV</strong> to open your personal TradingView chart, go to the bottom <span className="text-cyan-300">Trading Panel</span>, and click <span className="text-emerald-400 font-semibold">Paper Trading → Connect</span>.
-            </p>
+
+            {showWebhook && (
+              <div className="space-y-2 pt-1 border-t border-slate-800">
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-400 text-[9px]">TradingView Alert Webhook JSON:</span>
+                  <button
+                    type="button"
+                    onClick={handleCopyWebhook}
+                    className="flex items-center gap-1 text-[9px] bg-slate-800 px-2 py-0.5 rounded text-cyan-300 hover:bg-slate-700"
+                  >
+                    {copiedWebhook ? <Check className="w-2.5 h-2.5 text-emerald-400" /> : <Copy className="w-2.5 h-2.5" />}
+                    <span>{copiedWebhook ? "Copied!" : "Copy JSON"}</span>
+                  </button>
+                </div>
+                <pre className="bg-[#060a12] p-2 rounded text-[9px] text-slate-300 overflow-x-auto border border-slate-800">
+                  {webhookJsonSnippet}
+                </pre>
+
+                <div className="flex justify-between items-center pt-1">
+                  <span className="text-slate-400 text-[9px]">PineConnector Alert Syntax:</span>
+                  <button
+                    type="button"
+                    onClick={handleCopyPine}
+                    className="flex items-center gap-1 text-[9px] bg-slate-800 px-2 py-0.5 rounded text-cyan-300 hover:bg-slate-700"
+                  >
+                    {copiedPine ? <Check className="w-2.5 h-2.5 text-emerald-400" /> : <Copy className="w-2.5 h-2.5" />}
+                    <span>{copiedPine ? "Copied!" : "Copy Syntax"}</span>
+                  </button>
+                </div>
+                <pre className="bg-[#060a12] p-2 rounded text-[9px] text-emerald-400 overflow-x-auto border border-slate-800">
+                  {pineSyntaxSnippet}
+                </pre>
+              </div>
+            )}
           </div>
         </form>
       </div>

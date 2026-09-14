@@ -155,6 +155,8 @@ class PaperPosition(BaseModel):
     unrealized_pnl_pct: float
     stop_loss: Optional[float] = None
     take_profit: Optional[float] = None
+    broker_type: str = "LOCAL"  # LOCAL, BINANCE_TESTNET, BYBIT_TESTNET
+    exchange_watch_url: Optional[str] = None
     opened_at: str
 
 class PaperTradeRecord(BaseModel):
@@ -166,8 +168,22 @@ class PaperTradeRecord(BaseModel):
     value: float
     leverage: float = 1.0
     pnl: float = 0.0
+    broker_type: str = "LOCAL"
+    exchange_watch_url: Optional[str] = None
     reason: str = ""
     timestamp: str
+
+class AccuracySetupRating(BaseModel):
+    symbol: str
+    grade: str = "B"                      # A+, A, B, C
+    win_rate_expectancy: float = 60.0    # 78.4%, 68.5%, 55.0%, 42.0%
+    mtf_alignment: str = "NEUTRAL"       # STRONG_BULLISH_4X, BULLISH_3X, NEUTRAL_CHOP, BEARISH_3X, STRONG_BEARISH_4X
+    mtf_score: int = 2                   # Number of timeframes aligned (0-4)
+    cvd_divergence: str = "NONE"         # BULLISH_ABSORPTION, BEARISH_EXHAUSTION, NONE
+    funding_alignment: str = "FAVORABLE" # FAVORABLE, CROWDED, NEUTRAL
+    key_reasons: List[str] = []
+    recommended_action: str = "WAIT"     # EXECUTE_LONG, EXECUTE_SHORT, WAIT_CONFIRMATION
+    timestamp: str = ""
 
 class PortfolioState(BaseModel):
     cash: float

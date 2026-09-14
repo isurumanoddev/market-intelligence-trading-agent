@@ -2,7 +2,7 @@
 
 import React from "react";
 import { PortfolioState } from "@/types/market";
-import { Briefcase, RotateCcw, Zap } from "lucide-react";
+import { Briefcase, RotateCcw, Zap, ExternalLink } from "lucide-react";
 
 interface PortfolioFooterProps {
   portfolio: PortfolioState | null;
@@ -93,13 +93,14 @@ export const PortfolioFooter: React.FC<PortfolioFooterProps> = ({
               <th className="pb-1.5">Liq Price</th>
               <th className="pb-1.5">Unrealized PnL</th>
               <th className="pb-1.5">TP / SL</th>
+              <th className="pb-1.5">Broker / Watch</th>
               <th className="pb-1.5 text-right">Action</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800/40">
             {positions.length === 0 ? (
               <tr>
-                <td colSpan={11} className="py-5 text-center text-slate-500 font-sans text-xs">
+                <td colSpan={12} className="py-5 text-center text-slate-500 font-sans text-xs">
                   <div className="flex flex-col items-center justify-center gap-2">
                     <p>No active open positions in this paper trading margin account.</p>
                     {onOpenTradeModal && (
@@ -157,6 +158,31 @@ export const PortfolioFooter: React.FC<PortfolioFooterProps> = ({
                     <td className="py-2 text-[10px] text-slate-400">
                       <div className="text-emerald-400">TP: {p.take_profit ? `$${formatPrice(p.take_profit)}` : "--"}</div>
                       <div className="text-rose-400">SL: {p.stop_loss ? `$${formatPrice(p.stop_loss)}` : "--"}</div>
+                    </td>
+                    <td className="py-2 text-[10px]">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className={`px-1.5 py-0.2 rounded font-bold text-[9px] ${
+                          p.broker_type === "BINANCE_TESTNET"
+                            ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
+                            : p.broker_type === "BYBIT_TESTNET"
+                            ? "bg-purple-500/20 text-purple-300 border border-purple-500/40"
+                            : "bg-blue-500/20 text-blue-300 border border-blue-500/40"
+                        }`}>
+                          {p.broker_type === "BINANCE_TESTNET" ? "BINANCE" : p.broker_type === "BYBIT_TESTNET" ? "BYBIT" : "LOCAL"}
+                        </span>
+                        {p.exchange_watch_url && (
+                          <a
+                            href={p.exchange_watch_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-cyan-400 hover:text-cyan-300 underline font-semibold flex items-center gap-0.5 text-[10px]"
+                            title="Open live exchange orderbook / chart"
+                          >
+                            <span>Watch</span>
+                            <ExternalLink className="w-2.5 h-2.5" />
+                          </a>
+                        )}
+                      </div>
                     </td>
                     <td className="py-2 text-right">
                       <button

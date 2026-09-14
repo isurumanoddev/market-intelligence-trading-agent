@@ -243,6 +243,7 @@ export default function DashboardPage() {
     leverage: number;
     stop_loss?: number;
     take_profit?: number;
+    broker_type?: string;
     reason?: string;
   }) => {
     setIsExecutingTrade(true);
@@ -450,6 +451,7 @@ export default function DashboardPage() {
               }
               indicators={analysis?.indicators || null}
               decision={analysis?.decision || null}
+              accuracyRating={analysis?.accuracy_rating || null}
               currentPrice={analysis?.ticker?.price || 0}
               activePosition={activePosition}
               onClosePosition={handleClosePosition}
@@ -554,6 +556,7 @@ export default function DashboardPage() {
         initialSl={tradeModalParams.sl}
         initialTp={tradeModalParams.tp}
         initialLeverage={tradeModalParams.leverage || 5}
+        accuracyRating={analysis?.accuracy_rating || null}
         portfolio={portfolio}
         onExecute={handleModalExecute}
       />

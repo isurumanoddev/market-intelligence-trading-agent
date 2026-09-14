@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState, useMemo } from "react";
-import { TechnicalIndicators, TradingDecision, PaperPosition } from "@/types/market";
+import { TechnicalIndicators, TradingDecision, PaperPosition, AccuracySetupRating } from "@/types/market";
 import {
   Maximize2,
   Minimize2,
@@ -39,6 +39,7 @@ interface TradingViewAdvancedChartProps {
   indicators?: TechnicalIndicators | null;
   decision?: TradingDecision | null;
   currentPrice?: number;
+  accuracyRating?: AccuracySetupRating | null;
   activePosition?: PaperPosition | null;
   onClosePosition?: (id: string, currentPrice: number) => void;
   onExecuteTrade?: (side?: "BUY" | "SELL", entry?: number, sl?: number, tp?: number) => void;
@@ -88,6 +89,7 @@ export const TradingViewAdvancedChart: React.FC<TradingViewAdvancedChartProps> =
   indicators = null,
   decision = null,
   currentPrice = 0,
+  accuracyRating = null,
   activePosition = null,
   onClosePosition,
   onExecuteTrade,
@@ -869,6 +871,19 @@ export const TradingViewAdvancedChart: React.FC<TradingViewAdvancedChartProps> =
               </span>
             </div>
 
+            {/* Live Watch Link */}
+            {activePosition.exchange_watch_url && (
+              <a
+                href={activePosition.exchange_watch_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-2 py-1 rounded text-[11px] font-bold bg-cyan-600/20 hover:bg-cyan-600/40 text-cyan-300 border border-cyan-500/40 transition-colors flex items-center gap-1"
+                title="Watch real-time contracts / orderbook on exchange"
+              >
+                <span>↗ Watch on Exchange</span>
+              </a>
+            )}
+
             {/* Quick Actions */}
             <div className="flex items-center gap-1.5">
               <button
@@ -947,6 +962,19 @@ export const TradingViewAdvancedChart: React.FC<TradingViewAdvancedChartProps> =
                 </span>
               )}
             </span>
+
+            {accuracyRating && (
+              <span className={`px-2 py-0.5 rounded text-[10px] font-black border flex items-center gap-1 ${
+                accuracyRating.grade === "A+"
+                  ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/50 shadow-sm"
+                  : accuracyRating.grade === "A"
+                  ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/50"
+                  : "bg-amber-500/20 text-amber-300 border-amber-500/50"
+              }`}>
+                <Award className="w-3 h-3" />
+                <span>GRADE {accuracyRating.grade} ({accuracyRating.win_rate_expectancy}% WIN EXP)</span>
+              </span>
+            )}
           </div>
 
           {/* Trade Metrics: Entry, TP, SL, R:R */}

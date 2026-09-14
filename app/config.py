@@ -11,6 +11,13 @@ class Settings(BaseModel):
     coinglass_api_key: str = os.getenv("COINGLASS_API_KEY", "")
     telegram_bot_token: str = os.getenv("TELEGRAM_BOT_TOKEN", "")
     telegram_chat_id: str = os.getenv("TELEGRAM_CHAT_ID", "")
+
+    # Exchange Testnets (Demo Trading)
+    binance_testnet_api_key: str = os.getenv("BINANCE_TESTNET_API_KEY", "")
+    binance_testnet_secret: str = os.getenv("BINANCE_TESTNET_SECRET", "")
+    bybit_testnet_api_key: str = os.getenv("BYBIT_TESTNET_API_KEY", "")
+    bybit_testnet_secret: str = os.getenv("BYBIT_TESTNET_SECRET", "")
+    paper_broker_storage_path: str = os.getenv("PAPER_BROKER_STORAGE_PATH", "data/paper_broker_state.json")
     
     # Default settings
     default_exchange: str = os.getenv("DEFAULT_EXCHANGE", "kraken")

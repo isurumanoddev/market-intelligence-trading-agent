@@ -39,3 +39,7 @@ next-env.d.ts
 # BMad temporary render artifacts
 _bmad/render/
 
+# Local Persistence
+data/*.json
+!data/.gitkeep
+

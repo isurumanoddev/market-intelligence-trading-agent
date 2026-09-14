@@ -289,6 +289,8 @@ export interface PaperPosition {
   unrealized_pnl_pct: number;
   stop_loss?: number | null;
   take_profit?: number | null;
+  broker_type?: string;
+  exchange_watch_url?: string | null;
   opened_at: string;
 }
 
@@ -302,6 +304,8 @@ export interface PaperTradeRecord {
   leverage?: number;
   pnl: number;
   reason: string;
+  broker_type?: string;
+  exchange_watch_url?: string | null;
   timestamp: string;
 }
 
@@ -360,6 +364,19 @@ export interface CoinGlassData {
   timestamp: string;
 }
 
+export interface AccuracySetupRating {
+  symbol: string;
+  grade: "A+" | "A" | "B" | "C";
+  win_rate_expectancy: number;
+  mtf_alignment: string;
+  mtf_score: number;
+  cvd_divergence: string;
+  funding_alignment: string;
+  key_reasons: string[];
+  recommended_action: string;
+  timestamp: string;
+}
+
 export interface FullAnalysisData {
   symbol: string;
   ticker: Ticker;
@@ -375,6 +392,9 @@ export interface FullAnalysisData {
   sentiment: SentimentMetrics;
   news: NewsItem[];
   decision: TradingDecision;
+  accuracy_rating?: AccuracySetupRating | null;
+  mtf_trends?: Record<string, string> | null;
+  cvd_analysis?: any | null;
 }
 
 export interface SettingsData {
@@ -382,6 +402,10 @@ export interface SettingsData {
   gemini_key_masked: string;
   has_coinglass_key?: boolean;
   coinglass_key_masked?: string;
+  has_binance_testnet?: boolean;
+  binance_testnet_key_masked?: string;
+  has_bybit_testnet?: boolean;
+  bybit_testnet_key_masked?: string;
   has_telegram?: boolean;
   telegram_chat_id_masked?: string;
   default_exchange: string;

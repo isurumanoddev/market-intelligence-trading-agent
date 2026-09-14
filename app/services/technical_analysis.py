@@ -1,7 +1,8 @@
+from datetime import datetime
 import numpy as np
 from typing import List, Dict, Any, Optional
 from app.models.market_data import Candle, OrderBook, Trade
-from app.models.decision import TechnicalIndicators, MicrostructureMetrics, MonthlyContext
+from app.models.decision import TechnicalIndicators, MicrostructureMetrics, MonthlyContext, AccuracySetupRating
 
 class TechnicalAnalysisService:
 
@@ -381,6 +382,234 @@ class TechnicalAnalysisService:
             volume_avg_daily=round(avg_daily_vol, 2),
             volume_trend=vol_trend,
             macro_bias=macro_bias
+        )
+
+
+    @staticmethod
+    def calculate_mtf_trend(candles_dict: Dict[str, List[Candle]]) -> Dict[str, str]:
+        """
+        Calculates trend direction for multiple timeframes (e.g. '15m', '1h', '4h', '1d').
+        Uses EMA fast (9/20) vs EMA slow (21/50) and price positioning.
+        Returns e.g. {'15m': 'BULLISH', '1h': 'BULLISH', '4h': 'BEARISH', '1d': 'BULLISH'}
+        """
+        results = {}
+        for tf, c_list in candles_dict.items():
+            if not c_list or len(c_list) < 8:
+                results[tf] = "NEUTRAL"
+                continue
+            closes = np.array([c.close for c in c_list], dtype=float)
+            highs = np.array([c.high for c in c_list], dtype=float)
+            lows = np.array([c.low for c in c_list], dtype=float)
+
+            p_fast = min(9, len(closes))
+            p_slow = min(21, len(closes))
+            ema_fast = float(np.mean(closes[-p_fast:]))
+            ema_slow = float(np.mean(closes[-p_slow:]))
+            cur = closes[-1]
+
+            recent_higher_highs = highs[-1] >= highs[-p_fast]
+            recent_higher_lows = lows[-1] >= lows[-p_fast]
+
+            if cur >= ema_fast and ema_fast >= ema_slow and (recent_higher_highs or recent_higher_lows):
+                results[tf] = "BULLISH"
+            elif cur <= ema_fast and ema_fast <= ema_slow and not recent_higher_lows:
+                results[tf] = "BEARISH"
+            elif cur > ema_slow and ema_fast > ema_slow:
+                results[tf] = "BULLISH"
+            elif cur < ema_slow and ema_fast < ema_slow:
+                results[tf] = "BEARISH"
+            else:
+                results[tf] = "NEUTRAL"
+
+        return results
+
+    @staticmethod
+    def detect_cvd_divergence(candles: List[Candle], trades: Optional[List[Trade]] = None, cvd_value: float = 0.0) -> Dict[str, Any]:
+        """
+        Detects Order Flow Cumulative Volume Delta (CVD) Absorption & Divergences.
+        - Bullish Absorption: Price makes lower/equal low, but aggressive delta is heavily positive (bids absorbing).
+        - Bearish Exhaustion: Price makes higher/equal high, but delta is negative/dropping (selling into the rally).
+        """
+        if not candles or len(candles) < 10:
+            return {
+                "divergence_type": "NONE",
+                "absorption_detected": False,
+                "signal_strength": "NONE",
+                "delta_direction": "NEUTRAL",
+                "interpretation": "Insufficient candle depth for CVD orderflow analysis."
+            }
+
+        closes = [c.close for c in candles[-15:]]
+        highs = [c.high for c in candles[-15:]]
+        lows = [c.low for c in candles[-15:]]
+
+        candle_deltas = []
+        for c in candles[-15:]:
+            rng = max(c.high - c.low, 1e-6)
+            body_bias = (c.close - c.open) / rng
+            candle_deltas.append(c.volume * body_bias)
+
+        cum_delta_recent = sum(candle_deltas[-5:])
+        price_change_recent = (closes[-1] - closes[-5]) / closes[-5] if closes[-5] > 0 else 0
+
+        if cvd_value != 0.0:
+            net_delta_signal = cvd_value
+        else:
+            net_delta_signal = cum_delta_recent
+
+        if price_change_recent <= -0.002 and net_delta_signal > 0:
+            return {
+                "divergence_type": "BULLISH_ABSORPTION",
+                "absorption_detected": True,
+                "signal_strength": "HIGH" if price_change_recent < -0.01 else "MEDIUM",
+                "delta_direction": "POSITIVE",
+                "interpretation": "Institutional bids absorbing selling pressure at lows (Bullish Delta Absorption)."
+            }
+        elif price_change_recent >= 0.002 and net_delta_signal < 0:
+            return {
+                "divergence_type": "BEARISH_EXHAUSTION",
+                "absorption_detected": True,
+                "signal_strength": "HIGH" if price_change_recent > 0.01 else "MEDIUM",
+                "delta_direction": "NEGATIVE",
+                "interpretation": "Institutional supply dumping into buyer liquidity at highs (Bearish Delta Exhaustion)."
+            }
+        else:
+            return {
+                "divergence_type": "NONE",
+                "absorption_detected": False,
+                "signal_strength": "NONE",
+                "delta_direction": "POSITIVE" if net_delta_signal > 0 else "NEGATIVE",
+                "interpretation": "Order flow delta converging normally with price action."
+            }
+
+    @staticmethod
+    def calculate_accuracy_rating(
+        symbol: str,
+        current_price: float,
+        indicators: TechnicalIndicators,
+        mtf_trends: Dict[str, str],
+        cvd_divergence: str = "NONE",
+        derivatives: Optional[Any] = None
+    ) -> AccuracySetupRating:
+        """
+        Calculates Institutional Grade Setup & Win Expectancy.
+        Evaluates Multi-Timeframe Confluence, CVD Absorption, Derivatives Funding Bias, and Indicators.
+        """
+        bullish_tfs = [tf for tf, bias in mtf_trends.items() if bias == "BULLISH"]
+        bearish_tfs = [tf for tf, bias in mtf_trends.items() if bias == "BEARISH"]
+        bullish_count = len(bullish_tfs)
+        bearish_count = len(bearish_tfs)
+
+        if bullish_count >= 4:
+            mtf_alignment = "STRONG_BULLISH_4X"
+            mtf_score = 4
+        elif bullish_count == 3:
+            mtf_alignment = "BULLISH_3X"
+            mtf_score = 3
+        elif bearish_count >= 4:
+            mtf_alignment = "STRONG_BEARISH_4X"
+            mtf_score = 4
+        elif bearish_count == 3:
+            mtf_alignment = "BEARISH_3X"
+            mtf_score = 3
+        else:
+            mtf_alignment = "NEUTRAL_CHOP"
+            mtf_score = max(bullish_count, bearish_count)
+
+        funding_bias = getattr(derivatives, "funding_bias", "NEUTRAL") if derivatives else "NEUTRAL"
+        if (bullish_count >= 3 and funding_bias != "LONG_CROWDED") or (bearish_count >= 3 and funding_bias != "SHORT_CROWDED"):
+            funding_alignment = "FAVORABLE"
+        elif (bullish_count >= 3 and funding_bias == "LONG_CROWDED") or (bearish_count >= 3 and funding_bias == "SHORT_CROWDED"):
+            funding_alignment = "CROWDED"
+        else:
+            funding_alignment = "NEUTRAL"
+
+        score = 45.0
+        reasons = []
+
+        # 1. MTF Confluence
+        if mtf_score == 4:
+            score += 26.0
+            reasons.append(f"Unanimous 4X Multi-Timeframe Trend Confluence ({', '.join(mtf_trends.keys())})")
+        elif mtf_score == 3:
+            score += 18.0
+            reasons.append(f"Strong 3X Timeframe Confluence ({', '.join([k for k, v in mtf_trends.items() if v != 'NEUTRAL'])})")
+        else:
+            reasons.append("Mixed Timeframe Bias (Lower confluence / Chop)")
+
+        # 2. CVD Flow
+        if cvd_divergence == "BULLISH_ABSORPTION":
+            if bullish_count >= 2:
+                score += 16.0
+                reasons.append("Bullish CVD Absorption: Institutional accumulation at support")
+            else:
+                score += 8.0
+                reasons.append("CVD Bullish Divergence against counter-trend")
+        elif cvd_divergence == "BEARISH_EXHAUSTION":
+            if bearish_count >= 2:
+                score += 16.0
+                reasons.append("Bearish CVD Exhaustion: Institutional distribution at resistance")
+            else:
+                score += 8.0
+                reasons.append("CVD Bearish Divergence against counter-trend")
+
+        # 3. Supertrend
+        st_dir = getattr(indicators, "supertrend_direction", "NEUTRAL")
+        if st_dir == "BULLISH" and bullish_count >= 2:
+            score += 10.0
+            reasons.append("Supertrend Algorithmic Trend is Bullish")
+        elif st_dir == "BEARISH" and bearish_count >= 2:
+            score += 10.0
+            reasons.append("Supertrend Algorithmic Trend is Bearish")
+
+        # 4. RSI Momentum
+        rsi = getattr(indicators, "rsi", 50.0) or 50.0
+        if 42 <= rsi <= 64 and bullish_count >= 2:
+            score += 8.0
+            reasons.append(f"RSI ({rsi:.1f}) in prime bullish continuation corridor")
+        elif 36 <= rsi <= 58 and bearish_count >= 2:
+            score += 8.0
+            reasons.append(f"RSI ({rsi:.1f}) in prime bearish continuation corridor")
+
+        # 5. Funding Alignment
+        if funding_alignment == "FAVORABLE":
+            score += 8.0
+            reasons.append(f"Perpetual Funding Rate is Favorable ({funding_bias.replace('_', ' ')})")
+        elif funding_alignment == "CROWDED":
+            score -= 10.0
+            reasons.append("Derivatives Warning: Overcrowded positioning increases squeeze risk")
+
+        score = max(30.0, min(96.0, score))
+        if score >= 82.0:
+            grade = "A+"
+            win_rate = round(78.5 + (score - 82.0) * 0.7, 1)
+            recommended_action = "EXECUTE_LONG" if bullish_count > bearish_count else "EXECUTE_SHORT"
+        elif score >= 70.0:
+            grade = "A"
+            win_rate = round(68.0 + (score - 70.0) * 0.8, 1)
+            recommended_action = "EXECUTE_LONG" if bullish_count > bearish_count else "EXECUTE_SHORT"
+        elif score >= 55.0:
+            grade = "B"
+            win_rate = round(56.0 + (score - 55.0) * 0.7, 1)
+            recommended_action = "WAIT_CONFIRMATION"
+        else:
+            grade = "C"
+            win_rate = round(42.0 + (score - 30.0) * 0.5, 1)
+            recommended_action = "WAIT_CONFIRMATION"
+
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        return AccuracySetupRating(
+            symbol=symbol,
+            grade=grade,
+            win_rate_expectancy=win_rate,
+            mtf_alignment=mtf_alignment,
+            mtf_score=mtf_score,
+            cvd_divergence=cvd_divergence,
+            funding_alignment=funding_alignment,
+            key_reasons=reasons,
+            recommended_action=recommended_action,
+            timestamp=now_str
         )
 
 technical_analyzer = TechnicalAnalysisService()
