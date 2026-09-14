@@ -12,6 +12,18 @@ class Settings(BaseModel):
     telegram_bot_token: str = os.getenv("TELEGRAM_BOT_TOKEN", "")
     telegram_chat_id: str = os.getenv("TELEGRAM_CHAT_ID", "")
 
+    # WhatsApp Notifications (CallMeBot / Twilio / Webhook)
+    whatsapp_enabled: bool = os.getenv("WHATSAPP_ENABLED", "false").lower() == "true"
+    whatsapp_provider: str = os.getenv("WHATSAPP_PROVIDER", "callmebot")  # "callmebot", "twilio", "webhook"
+    whatsapp_phone: str = os.getenv("WHATSAPP_PHONE", "")                  # e.g. +1234567890
+    whatsapp_callmebot_key: str = os.getenv("WHATSAPP_CALLMEBOT_KEY", "")  # Free CallMeBot API key
+    twilio_account_sid: str = os.getenv("TWILIO_ACCOUNT_SID", "")
+    twilio_auth_token: str = os.getenv("TWILIO_AUTH_TOKEN", "")
+    twilio_from_number: str = os.getenv("TWILIO_FROM_NUMBER", "whatsapp:+14155238886")
+    whatsapp_webhook_url: str = os.getenv("WHATSAPP_WEBHOOK_URL", "")
+    btc_alert_watcher_enabled: bool = os.getenv("BTC_ALERT_WATCHER_ENABLED", "true").lower() == "true"
+    btc_alert_cooldown_minutes: int = int(os.getenv("BTC_ALERT_COOLDOWN_MINUTES", "15"))
+
     # Exchange Testnets (Demo Trading)
     binance_testnet_api_key: str = os.getenv("BINANCE_TESTNET_API_KEY", "")
     binance_testnet_secret: str = os.getenv("BINANCE_TESTNET_SECRET", "")

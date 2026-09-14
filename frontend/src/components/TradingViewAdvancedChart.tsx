@@ -23,7 +23,8 @@ import {
   Filter,
   Check,
   Copy,
-  Crosshair
+  Crosshair,
+  MessageSquare
 } from "lucide-react";
 
 declare global {
@@ -110,6 +111,8 @@ export const TradingViewAdvancedChart: React.FC<TradingViewAdvancedChartProps> =
   const [copiedPineScript, setCopiedPineScript] = useState<boolean>(false);
   const [selectedStudyPreset, setSelectedStudyPreset] = useState<string>("ALL");
   const [tradeSuccessMsg, setTradeSuccessMsg] = useState<string | null>(null);
+  const [isSendingWhatsApp, setIsSendingWhatsApp] = useState<boolean>(false);
+  const [whatsAppStatusMsg, setWhatsAppStatusMsg] = useState<string | null>(null);
 
   const containerId = `tv_chart_container_${symbol.replace(/[^a-zA-Z0-9]/g, "_")}`;
 
@@ -680,6 +683,29 @@ plotshape(entryCondition, title="Best Entry Signal", shape=${isLong ? "shape.tri
     setTimeout(() => setCopiedPineScript(false), 2500);
   };
 
+  const handleSendWhatsAppAlert = async () => {
+    setIsSendingWhatsApp(true);
+    setWhatsAppStatusMsg(null);
+    try {
+      const res = await fetch("/api/alerts/whatsapp/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ symbol }),
+      });
+      const data = await res.json();
+      if (data?.dispatch?.success) {
+        setWhatsAppStatusMsg("Sent to WhatsApp!");
+      } else {
+        setWhatsAppStatusMsg(data?.dispatch?.error ? "Check WhatsApp config in Settings" : "Sent!");
+      }
+    } catch {
+      setWhatsAppStatusMsg("Failed to send");
+    } finally {
+      setIsSendingWhatsApp(false);
+      setTimeout(() => setWhatsAppStatusMsg(null), 4000);
+    }
+  };
+
   // Studies configuration for TradingView widget
   const getStudiesForPreset = (preset: string) => {
     switch (preset) {
@@ -882,6 +908,24 @@ plotshape(entryCondition, title="Best Entry Signal", shape=${isLong ? "shape.tri
               AI AUTO
             </button>
           </div>
+
+          {/* WhatsApp Signal Alert Trigger Button & Indicator */}
+          <button
+            onClick={handleSendWhatsAppAlert}
+            disabled={isSendingWhatsApp}
+            className="hidden sm:flex items-center gap-1.5 px-2 py-0.5 text-[10px] font-mono rounded border transition-all bg-emerald-950/70 border-emerald-500/40 text-emerald-300 hover:bg-emerald-900 active:scale-95 shadow-sm"
+            title="Dispatch immediate Best Entry Signal for this chart to WhatsApp"
+          >
+            <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+            <MessageSquare className="w-3 h-3 text-emerald-400" />
+            <span>
+              {isSendingWhatsApp
+                ? "Sending..."
+                : whatsAppStatusMsg
+                ? whatsAppStatusMsg
+                : "WhatsApp Signal"}
+            </span>
+          </button>
 
           {/* Strategy Signals Toggle */}
           <button
@@ -1536,11 +1580,27 @@ plotshape(entryCondition, title="Best Entry Signal", shape=${isLong ? "shape.tri
 
                 <button
                   onClick={handleCopyPineScript}
-                  className="px-2.5 py-1.5 rounded bg-slate-900 hover:bg-slate-800 border border-slate-700 text-[10px] text-slate-300 hover:text-white transition-all flex items-center gap-1 shrink-0"
+                  className="px-2 py-1.5 rounded bg-slate-900 hover:bg-slate-800 border border-slate-700 text-[10px] text-slate-300 hover:text-white transition-all flex items-center gap-1 shrink-0"
                   title="Copy Pine Script indicator code to paste into TradingView Pine Editor"
                 >
                   {copiedPineScript ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                  <span>{copiedPineScript ? "Copied!" : "Pine Script"}</span>
+                  <span>{copiedPineScript ? "Copied!" : "Pine"}</span>
+                </button>
+
+                <button
+                  onClick={handleSendWhatsAppAlert}
+                  disabled={isSendingWhatsApp}
+                  className="px-2 py-1.5 rounded bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-500/50 text-[10px] text-emerald-300 hover:text-white transition-all flex items-center gap-1 shrink-0"
+                  title="Send this Best Entry Signal immediately to WhatsApp"
+                >
+                  <MessageSquare className="w-3 h-3 text-emerald-400" />
+                  <span>
+                    {isSendingWhatsApp
+                      ? "..."
+                      : whatsAppStatusMsg
+                      ? whatsAppStatusMsg
+                      : "WhatsApp"}
+                  </span>
                 </button>
               </div>
             </div>

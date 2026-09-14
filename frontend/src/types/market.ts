@@ -423,10 +423,61 @@ export interface SettingsData {
   bybit_testnet_key_masked?: string;
   has_telegram?: boolean;
   telegram_chat_id_masked?: string;
+  has_whatsapp?: boolean;
+  whatsapp_enabled?: boolean;
+  whatsapp_provider?: "callmebot" | "twilio" | "webhook" | string;
+  whatsapp_phone?: string;
+  whatsapp_phone_masked?: string;
+  has_callmebot_key?: boolean;
+  callmebot_key_masked?: string;
+  has_twilio?: boolean;
+  btc_alert_watcher_enabled?: boolean;
   default_exchange: string;
   default_symbols: string[];
   max_risk_per_trade_pct: number;
   max_spread_pct: number;
+}
+
+export interface WhatsAppAlertRecord {
+  id: string;
+  symbol: string;
+  side: "BUY" | "SELL";
+  entry_price: number;
+  current_price: number;
+  stop_loss: number;
+  take_profit_1: number;
+  take_profit_2: number;
+  grade: string;
+  win_expectancy: number;
+  confluences: string[];
+  timestamp: string;
+  status: "DELIVERED" | "FAILED" | "SIMULATED";
+}
+
+export interface WhatsAppAlertStatus {
+  enabled: boolean;
+  target_symbol: string;
+  tolerance_pct: number;
+  cooldown_minutes: number;
+  last_eval_time: string;
+  last_price: number;
+  latest_setup: {
+    symbol: string;
+    side: "BUY" | "SELL";
+    current_price: number;
+    optimal_entry: number;
+    stop_loss: number;
+    take_profit_1: number;
+    take_profit_2: number;
+    grade: string;
+    win_expectancy: number;
+    confluences: string[];
+    timestamp: string;
+  } | null;
+  distance_to_entry_pct: number;
+  whatsapp_configured: boolean;
+  total_alerts_sent: number;
+  alert_history: WhatsAppAlertRecord[];
 }
 
 export interface BacktestRequest {

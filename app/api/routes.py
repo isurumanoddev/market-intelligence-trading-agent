@@ -21,6 +21,8 @@ from app.services.llm_predictor import llm_predictor
 from app.services.tradingview_service import tradingview_service
 from app.services.exchange_broker_service import exchange_broker_service
 from app.services.coin_catalog_service import coin_catalog_service
+from app.services.whatsapp_service import whatsapp_service
+from app.services.entry_alert_watcher import entry_alert_watcher
 
 router = APIRouter()
 
@@ -52,6 +54,16 @@ class SettingsUpdateRequest(BaseModel):
     default_exchange: Optional[str] = None
     max_risk_per_trade_pct: Optional[float] = None
     max_spread_pct: Optional[float] = None
+    # WhatsApp Signal Alerts
+    whatsapp_enabled: Optional[bool] = None
+    whatsapp_provider: Optional[str] = None
+    whatsapp_phone: Optional[str] = None
+    whatsapp_callmebot_key: Optional[str] = None
+    twilio_account_sid: Optional[str] = None
+    twilio_auth_token: Optional[str] = None
+    twilio_from_number: Optional[str] = None
+    whatsapp_webhook_url: Optional[str] = None
+    btc_alert_watcher_enabled: Optional[bool] = None
 
 @router.get("/market/coins")
 async def get_market_coins(
@@ -545,6 +557,15 @@ async def get_settings():
         "bybit_testnet_key_masked": f"{settings.bybit_testnet_api_key[:4]}...{settings.bybit_testnet_api_key[-4:]}" if len(settings.bybit_testnet_api_key) > 8 else ("Configured" if settings.bybit_testnet_api_key else "Not configured"),
         "has_telegram": telegram_service.is_configured(),
         "telegram_chat_id_masked": f"...{settings.telegram_chat_id[-4:]}" if len(settings.telegram_chat_id) > 4 else ("Configured" if settings.telegram_chat_id else "Not configured"),
+        "has_whatsapp": whatsapp_service.is_configured(),
+        "whatsapp_enabled": settings.whatsapp_enabled,
+        "whatsapp_provider": settings.whatsapp_provider,
+        "whatsapp_phone": settings.whatsapp_phone,
+        "whatsapp_phone_masked": f"...{settings.whatsapp_phone[-4:]}" if len(settings.whatsapp_phone) > 4 else ("Configured" if settings.whatsapp_phone else "Not configured"),
+        "has_callmebot_key": bool(settings.whatsapp_callmebot_key),
+        "callmebot_key_masked": f"{settings.whatsapp_callmebot_key[:2]}...{settings.whatsapp_callmebot_key[-2:]}" if len(settings.whatsapp_callmebot_key) > 4 else ("Configured" if settings.whatsapp_callmebot_key else "Not configured"),
+        "has_twilio": bool(settings.twilio_account_sid and settings.twilio_auth_token),
+        "btc_alert_watcher_enabled": settings.btc_alert_watcher_enabled,
         "default_exchange": settings.default_exchange,
         "default_symbols": settings.default_symbols,
         "max_risk_per_trade_pct": settings.max_risk_per_trade_pct,
@@ -569,6 +590,25 @@ async def update_settings(req: SettingsUpdateRequest):
         settings.telegram_bot_token = req.telegram_bot_token.strip()
     if req.telegram_chat_id is not None:
         settings.telegram_chat_id = req.telegram_chat_id.strip()
+    if req.whatsapp_enabled is not None:
+        settings.whatsapp_enabled = req.whatsapp_enabled
+    if req.whatsapp_provider is not None:
+        settings.whatsapp_provider = req.whatsapp_provider.strip().lower()
+    if req.whatsapp_phone is not None:
+        settings.whatsapp_phone = req.whatsapp_phone.strip()
+    if req.whatsapp_callmebot_key is not None:
+        settings.whatsapp_callmebot_key = req.whatsapp_callmebot_key.strip()
+    if req.twilio_account_sid is not None:
+        settings.twilio_account_sid = req.twilio_account_sid.strip()
+    if req.twilio_auth_token is not None:
+        settings.twilio_auth_token = req.twilio_auth_token.strip()
+    if req.twilio_from_number is not None:
+        settings.twilio_from_number = req.twilio_from_number.strip()
+    if req.whatsapp_webhook_url is not None:
+        settings.whatsapp_webhook_url = req.whatsapp_webhook_url.strip()
+    if req.btc_alert_watcher_enabled is not None:
+        settings.btc_alert_watcher_enabled = req.btc_alert_watcher_enabled
+        entry_alert_watcher.enabled = req.btc_alert_watcher_enabled
     if req.default_exchange is not None:
         settings.default_exchange = req.default_exchange.strip().lower()
     if req.max_risk_per_trade_pct is not None:
@@ -576,6 +616,46 @@ async def update_settings(req: SettingsUpdateRequest):
     if req.max_spread_pct is not None:
         settings.max_spread_pct = req.max_spread_pct
     return {"status": "success", "settings": await get_settings()}
+
+# ------------------ WhatsApp Alerts API ------------------
+
+@router.get("/alerts/whatsapp/status")
+async def get_whatsapp_alert_status():
+    """Returns the real-time status of the BTC Best Entry Point WhatsApp Watcher."""
+    return entry_alert_watcher.get_status()
+
+class WhatsAppToggleRequest(BaseModel):
+    enabled: Optional[bool] = None
+
+@router.post("/alerts/whatsapp/toggle")
+async def toggle_whatsapp_alerts(req: Optional[WhatsAppToggleRequest] = None):
+    """Enables or disables autonomous BTC Best Entry Point WhatsApp monitoring."""
+    target_state = req.enabled if req else None
+    new_state = entry_alert_watcher.toggle(target_state)
+    settings.btc_alert_watcher_enabled = new_state
+    if new_state:
+        await entry_alert_watcher.start()
+    else:
+        await entry_alert_watcher.stop()
+    return {"status": "success", "enabled": new_state}
+
+class WhatsAppTestRequest(BaseModel):
+    symbol: str = "BTC/USDT"
+    custom_message: Optional[str] = None
+
+@router.post("/alerts/whatsapp/test")
+async def test_whatsapp_alert(req: Optional[WhatsAppTestRequest] = None):
+    """Dispatches a test VIP trading signal to WhatsApp for verification."""
+    sym = req.symbol if req and req.symbol else "BTC/USDT"
+    if req and req.custom_message:
+        res = await asyncio.to_thread(whatsapp_service.send_message, req.custom_message)
+        return {"status": "dispatched", "result": res}
+    return await entry_alert_watcher.trigger_immediate_test(sym)
+
+@router.post("/alerts/whatsapp/trigger-now")
+async def trigger_whatsapp_alert_now(symbol: str = "BTC/USDT"):
+    """Forces an immediate evaluation of the Best Entry Point and triggers a signal if available."""
+    return await entry_alert_watcher.trigger_immediate_test(symbol)
 
 # ------------------ Backtesting Engine API (Stage 1) ------------------
 
