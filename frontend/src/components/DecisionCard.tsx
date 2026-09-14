@@ -9,12 +9,14 @@ import { HorizonDetailPanel } from "./HorizonDetailPanel";
 interface DecisionCardProps {
   decision: TradingDecision | null;
   onExecuteTrade: () => void;
+  onOpenTradeModal?: (params?: { side?: "BUY" | "SELL"; entry?: number; sl?: number; tp?: number; leverage?: number }) => void;
   isExecuting: boolean;
 }
 
 export const DecisionCard: React.FC<DecisionCardProps> = ({
   decision,
   onExecuteTrade,
+  onOpenTradeModal,
   isExecuting,
 }) => {
   const [activeTab, setActiveTab] = useState<"confluence" | "macro" | "forecast" | "micro" | "news" | "risk">("confluence");
@@ -131,17 +133,29 @@ export const DecisionCard: React.FC<DecisionCardProps> = ({
 
       {/* Execute Paper Trade Button */}
       <button
-        onClick={onExecuteTrade}
+        onClick={() => {
+          if (onOpenTradeModal && decision) {
+            onOpenTradeModal({
+              side: isSell ? "SELL" : "BUY",
+              entry: decision.entry_zone?.[0] || decision.current_price,
+              sl: decision.stop_loss,
+              tp: decision.take_profit_1,
+              leverage: 5,
+            });
+            return;
+          }
+          onExecuteTrade();
+        }}
         disabled={isExecuting}
         className={`w-full py-2.5 px-4 rounded font-bold text-xs tracking-wider text-white flex items-center justify-center gap-2 shadow-lg transition-all ${
           isSell
-            ? "bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 shadow-rose-600/30"
-            : "bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 shadow-emerald-600/30"
+            ? "bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 shadow-rose-600/30 active:scale-[0.99]"
+            : "bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 shadow-emerald-600/30 active:scale-[0.99]"
         } disabled:opacity-50`}
       >
         <Zap className="w-4 h-4 fill-white" />
         <span>
-          {isExecuting ? "Executing Order..." : `⚡ Execute Paper Trade (${isSell ? "SELL" : "BUY"})`}
+          {isExecuting ? "Executing Order..." : `⚡ Execute Paper Trade (${isSell ? "SELL" : "BUY"} • Leverage / TP / SL)`}
         </span>
       </button>
 

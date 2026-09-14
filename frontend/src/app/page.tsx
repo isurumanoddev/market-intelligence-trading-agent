@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Header } from "@/components/Header";
 import { TickerBanner } from "@/components/TickerBanner";
 import { CandleChart } from "@/components/CandleChart";
+import { TradingViewAdvancedChart } from "@/components/TradingViewAdvancedChart";
 import { OrderBookLadder } from "@/components/OrderBookLadder";
 import { TradeTape } from "@/components/TradeTape";
 import { DecisionCard } from "@/components/DecisionCard";
@@ -13,6 +14,7 @@ import { SettingsModal } from "@/components/SettingsModal";
 import { TradingBotStudioModal } from "@/components/TradingBotStudioModal";
 import { LLMPredictionPanel } from "@/components/LLMPredictionPanel";
 import { HelpAcademyModal } from "@/components/HelpAcademyModal";
+import { PaperTradeModal } from "@/components/PaperTradeModal";
 import {
   fetchAnalysis,
   fetchCandles,
@@ -67,6 +69,8 @@ function generateInitialCandles(symbol: string, timeframe: string): Candle[] {
 export default function DashboardPage() {
   const [currentSymbol, setCurrentSymbol] = useState("BTC/USDT");
   const [currentTimeframe, setCurrentTimeframe] = useState("1h");
+  const [activeChartView, setActiveChartView] = useState<"AI_QUANT" | "TRADINGVIEW">("TRADINGVIEW");
+  const [isChartWide, setIsChartWide] = useState(true);
   const [refreshInterval, setRefreshInterval] = useState(10000);
   const [centerTab, setCenterTab] = useState<"book" | "tape">("book");
 
@@ -82,6 +86,14 @@ export default function DashboardPage() {
   const [isTradingBotOpen, setIsTradingBotOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [botStatusText, setBotStatusText] = useState<string>("STOPPED");
+  const [isTradeModalOpen, setIsTradeModalOpen] = useState(false);
+  const [tradeModalParams, setTradeModalParams] = useState<{
+    side?: "BUY" | "SELL";
+    entry?: number;
+    sl?: number;
+    tp?: number;
+    leverage?: number;
+  }>({});
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [llmPrediction, setLlmPrediction] = useState<LLMPredictionResult | null>(null);
@@ -207,6 +219,45 @@ export default function DashboardPage() {
     return () => clearInterval(interval);
   }, []);
 
+  // Open Paper Trade Order Modal (custom size, leverage, TP, SL)
+  const handleOpenTradeModal = useCallback(
+    (params?: {
+      side?: "BUY" | "SELL";
+      entry?: number;
+      sl?: number;
+      tp?: number;
+      leverage?: number;
+    }) => {
+      setTradeModalParams(params || {});
+      setIsTradeModalOpen(true);
+    },
+    []
+  );
+
+  // Execute Order from Ticket Modal
+  const handleModalExecute = async (payload: {
+    symbol: string;
+    side: "BUY" | "SELL";
+    price: number;
+    amount: number;
+    leverage: number;
+    stop_loss?: number;
+    take_profit?: number;
+    broker_type?: string;
+    reason?: string;
+  }) => {
+    setIsExecutingTrade(true);
+    try {
+      await executeTrade(payload);
+      await loadPortfolioData();
+    } catch (err: any) {
+      console.error("Trade execution error:", err);
+      throw err;
+    } finally {
+      setIsExecutingTrade(false);
+    }
+  };
+
   // Execute Paper Trade (supports DecisionCard & In-Chart Signals)
   const handleExecuteTrade = async (
     customSide?: "BUY" | "SELL",
@@ -270,6 +321,8 @@ export default function DashboardPage() {
     await loadAnalysis(currentSymbol);
   };
 
+  const activePosition = portfolio?.positions?.find((p) => p.symbol === currentSymbol) || null;
+
   return (
     <div className="min-h-screen bg-[#070a13] text-slate-100 flex flex-col font-sans select-none antialiased">
       {/* Top Application Header */}
@@ -331,24 +384,86 @@ export default function DashboardPage() {
       {/* Main Trading Terminal Multi-Column Grid */}
       <main className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-3 p-3">
 
-        {/* Left Column: Candlestick Chart & Quantitative Oscillators (5 cols) */}
-        <div className="lg:col-span-5 flex flex-col gap-3">
-          <CandleChart
-            candles={candles}
-            indicators={analysis?.indicators || null}
-            forecast={analysis?.price_forecast || null}
-            decision={analysis?.decision || null}
-            currentTimeframe={currentTimeframe}
-            onChangeTimeframe={handleTimeframeChange}
-            exchange={analysis?.ticker?.exchange || "KRAKEN"}
-            isLoading={isCandlesLoading}
-            onExecuteTrade={handleExecuteTrade}
-            isExecutingTrade={isExecutingTrade}
-          />
+        {/* Left Column: Candlestick Chart & Quantitative Oscillators */}
+        <div className={`${isChartWide ? "lg:col-span-8" : "lg:col-span-5"} flex flex-col gap-2 transition-all duration-300`}>
+          {/* Chart Mode Switcher Header */}
+          <div className="flex items-center justify-between bg-slate-900/90 px-3 py-1.5 rounded-lg border border-slate-800 text-xs font-mono">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-slate-500 uppercase tracking-wider mr-1">Chart Engine:</span>
+              <button
+                onClick={() => setActiveChartView("AI_QUANT")}
+                className={`px-2.5 py-1 rounded font-bold transition-all flex items-center gap-1.5 text-xs ${
+                  activeChartView === "AI_QUANT"
+                    ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm shadow-cyan-500/10"
+                    : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
+                }`}
+              >
+                <span>🔮 AI Quant Terminal</span>
+                <span className="text-[10px] opacity-75 hidden sm:inline">(Predictions & S/R)</span>
+              </button>
+
+              <button
+                onClick={() => setActiveChartView("TRADINGVIEW")}
+                className={`px-2.5 py-1 rounded font-bold transition-all flex items-center gap-1.5 text-xs ${
+                  activeChartView === "TRADINGVIEW"
+                    ? "bg-blue-600/30 text-blue-300 border border-blue-500/50 shadow-sm shadow-blue-500/10"
+                    : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
+                }`}
+              >
+                <span>📈 TradingView Advanced</span>
+                <span className="text-[10px] opacity-75 hidden sm:inline">(100+ Indicators)</span>
+              </button>
+            </div>
+
+            {/* Layout Expand Button */}
+            <button
+              onClick={() => setIsChartWide(!isChartWide)}
+              className="text-[11px] text-slate-400 hover:text-white px-2 py-0.5 rounded border border-slate-700/60 hover:bg-slate-800 transition-colors hidden xl:inline-block"
+              title="Expand chart canvas to 8 columns"
+            >
+              {isChartWide ? "⤺ Standard (5 Cols)" : "⤢ Wide View (8 Cols)"}
+            </button>
+          </div>
+
+          {/* Active Chart Component */}
+          {activeChartView === "AI_QUANT" ? (
+            <CandleChart
+              candles={candles}
+              indicators={analysis?.indicators || null}
+              forecast={analysis?.price_forecast || null}
+              decision={analysis?.decision || null}
+              currentTimeframe={currentTimeframe}
+              onChangeTimeframe={handleTimeframeChange}
+              exchange={analysis?.ticker?.exchange || "KRAKEN"}
+              isLoading={isCandlesLoading}
+              onExecuteTrade={handleExecuteTrade}
+              isExecutingTrade={isExecutingTrade}
+            />
+          ) : (
+            <TradingViewAdvancedChart
+              symbol={currentSymbol}
+              defaultInterval={
+                currentTimeframe === "1d" ? "D" :
+                currentTimeframe === "4h" ? "240" :
+                currentTimeframe === "15m" ? "15" :
+                currentTimeframe === "5m" ? "5" :
+                currentTimeframe === "1m" ? "1" : "60"
+              }
+              indicators={analysis?.indicators || null}
+              decision={analysis?.decision || null}
+              accuracyRating={analysis?.accuracy_rating || null}
+              currentPrice={analysis?.ticker?.price || 0}
+              activePosition={activePosition}
+              onClosePosition={handleClosePosition}
+              onExecuteTrade={handleExecuteTrade}
+              onOpenTradeModal={handleOpenTradeModal}
+              isExecutingTrade={isExecutingTrade}
+            />
+          )}
         </div>
 
-        {/* Center Column: Order Book Depth Ladder & Trade Tape (3 cols) */}
-        <div className="lg:col-span-3 bg-[#0c101d] border border-slate-800/90 rounded-lg flex flex-col overflow-hidden shadow-xl">
+        {/* Center Column: Order Book Depth Ladder & Trade Tape (3 cols, or 4 cols in wide view) */}
+        <div className={`${isChartWide ? "lg:col-span-4" : "lg:col-span-3"} bg-[#0c101d] border border-slate-800/90 rounded-lg flex flex-col overflow-hidden shadow-xl transition-all duration-300`}>
           {/* Pro Tab Switcher */}
           <div className="flex border-b border-slate-800/80 bg-[#080d1a]">
             <button
@@ -386,11 +501,12 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Right Column: AI Master Decision Arbiter & Macro News Intelligence (4 cols) */}
-        <div className="lg:col-span-4 flex flex-col gap-3">
+        {/* Right Column: AI Master Decision Arbiter & Macro News Intelligence (4 cols, or 12 cols 2-grid in wide view) */}
+        <div className={`${isChartWide ? "lg:col-span-12 grid grid-cols-1 md:grid-cols-2 gap-3" : "lg:col-span-4 flex flex-col gap-3"} transition-all duration-300`}>
           <DecisionCard
             decision={analysis?.decision || null}
             onExecuteTrade={handleExecuteTrade}
+            onOpenTradeModal={handleOpenTradeModal}
             isExecuting={isExecutingTrade}
           />
           <NewsFeed
@@ -405,6 +521,7 @@ export default function DashboardPage() {
         portfolio={portfolio}
         onClosePosition={handleClosePosition}
         onResetPortfolio={handleResetPortfolio}
+        onOpenTradeModal={() => handleOpenTradeModal()}
       />
 
       {/* Settings Modal */}
@@ -426,6 +543,22 @@ export default function DashboardPage() {
       <HelpAcademyModal
         isOpen={isHelpOpen}
         onClose={() => setIsHelpOpen(false)}
+      />
+
+      {/* Interactive Paper Trading Order Ticket Modal (Leverage, Position Size, TP, SL, TV Paper Link) */}
+      <PaperTradeModal
+        isOpen={isTradeModalOpen}
+        onClose={() => setIsTradeModalOpen(false)}
+        symbol={currentSymbol}
+        currentPrice={tradeModalParams.entry || analysis?.ticker?.price || analysis?.decision?.current_price || 0}
+        initialSide={tradeModalParams.side || (analysis?.decision?.action?.includes("SELL") ? "SELL" : "BUY")}
+        initialEntry={tradeModalParams.entry}
+        initialSl={tradeModalParams.sl}
+        initialTp={tradeModalParams.tp}
+        initialLeverage={tradeModalParams.leverage || 5}
+        accuracyRating={analysis?.accuracy_rating || null}
+        portfolio={portfolio}
+        onExecute={handleModalExecute}
       />
     </div>
   );

@@ -78,11 +78,25 @@ export interface TechnicalIndicators {
   ema_20: number | null;
   ema_50: number | null;
   ema_200: number | null;
+  sma_20?: number | null;
+  sma_50?: number | null;
+  sma_200?: number | null;
   vwap: number | null;
+  vwap_upper_1?: number | null;
+  vwap_lower_1?: number | null;
   atr: number | null;
   bb_upper: number | null;
   bb_middle: number | null;
   bb_lower: number | null;
+  supertrend_value?: number | null;
+  supertrend_direction?: "BULLISH" | "BEARISH";
+  stoch_k?: number | null;
+  stoch_d?: number | null;
+  adx?: number | null;
+  adx_trend_strength?: "STRONG_TREND" | "TRENDING" | "RANGING_CHOP" | "WEAK";
+  fvg_detected?: boolean;
+  fvg_type?: "BULLISH_FVG" | "BEARISH_FVG" | "NONE";
+  fvg_price_level?: number | null;
   trend_state: "BULLISH" | "BEARISH" | "NEUTRAL";
   rsi_state: "OVERSOLD" | "OVERBOUGHT" | "NEUTRAL";
 }
@@ -267,11 +281,16 @@ export interface PaperPosition {
   current_price: number;
   amount: number;
   cost_basis: number;
+  margin?: number;
+  leverage?: number;
+  liquidation_price?: number | null;
   current_value: number;
   unrealized_pnl: number;
   unrealized_pnl_pct: number;
   stop_loss?: number | null;
   take_profit?: number | null;
+  broker_type?: string;
+  exchange_watch_url?: string | null;
   opened_at: string;
 }
 
@@ -282,8 +301,11 @@ export interface PaperTradeRecord {
   price: number;
   amount: number;
   value: number;
+  leverage?: number;
   pnl: number;
   reason: string;
+  broker_type?: string;
+  exchange_watch_url?: string | null;
   timestamp: string;
 }
 
@@ -342,6 +364,19 @@ export interface CoinGlassData {
   timestamp: string;
 }
 
+export interface AccuracySetupRating {
+  symbol: string;
+  grade: "A+" | "A" | "B" | "C";
+  win_rate_expectancy: number;
+  mtf_alignment: string;
+  mtf_score: number;
+  cvd_divergence: string;
+  funding_alignment: string;
+  key_reasons: string[];
+  recommended_action: string;
+  timestamp: string;
+}
+
 export interface FullAnalysisData {
   symbol: string;
   ticker: Ticker;
@@ -357,6 +392,9 @@ export interface FullAnalysisData {
   sentiment: SentimentMetrics;
   news: NewsItem[];
   decision: TradingDecision;
+  accuracy_rating?: AccuracySetupRating | null;
+  mtf_trends?: Record<string, string> | null;
+  cvd_analysis?: any | null;
 }
 
 export interface SettingsData {
@@ -364,6 +402,10 @@ export interface SettingsData {
   gemini_key_masked: string;
   has_coinglass_key?: boolean;
   coinglass_key_masked?: string;
+  has_binance_testnet?: boolean;
+  binance_testnet_key_masked?: string;
+  has_bybit_testnet?: boolean;
+  bybit_testnet_key_masked?: string;
   has_telegram?: boolean;
   telegram_chat_id_masked?: string;
   default_exchange: string;
@@ -381,7 +423,11 @@ export interface BacktestRequest {
     | "DERIVATIVES_SQUEEZE" 
     | "NEWS_MACRO_MOMENTUM" 
     | "QUANT_ALPHA_CONFLUENCE"
-    | "CONFLUENCE";
+    | "CONFLUENCE"
+    | "SUPERTREND_ATR"
+    | "SMART_MONEY_FVG"
+    | "STOCH_RSI_CROSS"
+    | "VWAP_MEAN_REVERSION";
   timeframe: string;
   lookback_days: number;
   initial_capital: number;

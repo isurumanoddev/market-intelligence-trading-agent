@@ -88,3 +88,55 @@ def test_backtest_engine_quant_alpha_confluence():
     assert result is not None
     assert result.metrics.initial_capital == 10000.0
     assert len(result.equity_curve) > 0
+
+def test_backtest_engine_supertrend_atr():
+    req = BacktestRequest(
+        symbol="BTC/USDT",
+        strategy="SUPERTREND_ATR",
+        timeframe="1h",
+        lookback_days=60,
+        initial_capital=10000.0
+    )
+    result = backtest_engine.run_backtest(req)
+    assert result is not None
+    assert result.metrics.initial_capital == 10000.0
+    assert len(result.equity_curve) > 0
+
+def test_backtest_engine_smart_money_fvg():
+    req = BacktestRequest(
+        symbol="BTC/USDT",
+        strategy="SMART_MONEY_FVG",
+        timeframe="1h",
+        lookback_days=60,
+        initial_capital=10000.0
+    )
+    result = backtest_engine.run_backtest(req)
+    assert result is not None
+    assert result.metrics.initial_capital == 10000.0
+    assert len(result.equity_curve) > 0
+
+def test_backtest_engine_stoch_rsi_cross():
+    req = BacktestRequest(
+        symbol="SOL/USDT",
+        strategy="STOCH_RSI_CROSS",
+        timeframe="1h",
+        lookback_days=60,
+        initial_capital=10000.0
+    )
+    result = backtest_engine.run_backtest(req)
+    assert result is not None
+    assert result.metrics.initial_capital == 10000.0
+    assert len(result.equity_curve) > 0
+
+def test_backtest_engine_vwap_mean_reversion():
+    req = BacktestRequest(
+        symbol="ETH/USDT",
+        strategy="VWAP_MEAN_REVERSION",
+        timeframe="1h",
+        lookback_days=60,
+        initial_capital=10000.0
+    )
+    result = backtest_engine.run_backtest(req)
+    assert result is not None
+    assert result.metrics.initial_capital == 10000.0
+    assert len(result.equity_curve) > 0

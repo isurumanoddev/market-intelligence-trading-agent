@@ -53,8 +53,10 @@ export async function executeTrade(payload: {
   side: "BUY" | "SELL";
   price: number;
   amount: number;
+  leverage?: number;
   stop_loss?: number;
   take_profit?: number;
+  broker_type?: string;
   reason?: string;
 }) {
   const res = await fetch(`${API_BASE}/portfolio/trade`, {
@@ -100,6 +102,11 @@ export async function fetchSettings(): Promise<SettingsData> {
 
 export async function updateSettings(payload: {
   gemini_api_key?: string;
+  coinglass_api_key?: string;
+  binance_testnet_api_key?: string;
+  binance_testnet_secret?: string;
+  bybit_testnet_api_key?: string;
+  bybit_testnet_secret?: string;
   default_exchange?: string;
   max_risk_per_trade_pct?: number;
   max_spread_pct?: number;
@@ -128,3 +135,41 @@ export async function fetchLLMPrediction(
   return res.json();
 }
 
+export async function fetchAccuracyRating(symbol: string) {
+  const res = await fetch(`${API_BASE}/market/accuracy-rating?symbol=${encodeURIComponent(symbol)}`, {
+    cache: "no-store",
+  });
+  if (!res.ok) return null;
+  return res.json();
+}
+
+export async function fetchExchangeStatus() {
+  const res = await fetch(`${API_BASE}/portfolio/exchange-status`, { cache: "no-store" });
+  if (!res.ok) return null;
+  return res.json();
+}
+
+export async function fetchTradingViewWebhookTemplate(params: {
+  symbol: string;
+  side: string;
+  price: number;
+  amount: number;
+  leverage?: number;
+  stop_loss?: number;
+  take_profit?: number;
+}) {
+  const query = new URLSearchParams({
+    symbol: params.symbol,
+    side: params.side,
+    price: params.price.toString(),
+    amount: params.amount.toString(),
+    leverage: (params.leverage || 1).toString(),
+    ...(params.stop_loss ? { stop_loss: params.stop_loss.toString() } : {}),
+    ...(params.take_profit ? { take_profit: params.take_profit.toString() } : {}),
+  });
+  const res = await fetch(`${API_BASE}/portfolio/tradingview-webhook-template?${query.toString()}`, {
+    cache: "no-store",
+  });
+  if (!res.ok) return null;
+  return res.json();
+}

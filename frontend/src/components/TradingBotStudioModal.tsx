@@ -31,6 +31,10 @@ export function TradingBotStudioModal({ isOpen, onClose, currentSymbol }: Tradin
     | "NEWS_MACRO_MOMENTUM"
     | "QUANT_ALPHA_CONFLUENCE"
     | "CONFLUENCE"
+    | "SUPERTREND_ATR"
+    | "SMART_MONEY_FVG"
+    | "STOCH_RSI_CROSS"
+    | "VWAP_MEAN_REVERSION"
   >("QUANT_ALPHA_CONFLUENCE");
   const [btTimeframe, setBtTimeframe] = useState("1h");
   const [btDays, setBtDays] = useState(90);
@@ -326,6 +330,10 @@ export function TradingBotStudioModal({ isOpen, onClose, currentSymbol }: Tradin
                     className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-cyan-300 font-bold"
                   >
                     <option value="QUANT_ALPHA_CONFLUENCE">Quant Alpha Master (Multi-Regime Confluence)</option>
+                    <option value="SUPERTREND_ATR">Supertrend ATR Volatility Trend (10, 3.0)</option>
+                    <option value="SMART_MONEY_FVG">Smart Money Concepts (FVG Liquidity Imbalance)</option>
+                    <option value="STOCH_RSI_CROSS">Stochastic RSI Double-Bottom Reversal</option>
+                    <option value="VWAP_MEAN_REVERSION">VWAP Multi-Sigma Band Mean Reversion</option>
                     <option value="NEWS_MACRO_MOMENTUM">News Sentiment & Macro Momentum (Fed, CPI, Flows)</option>
                     <option value="DERIVATIVES_SQUEEZE">Derivatives Liquidity Squeeze (Funding Rate Arbitrage)</option>
                     <option value="BOLLINGER_REVERSION">Bollinger Mean Reversion (Volatility Scalper)</option>
