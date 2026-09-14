@@ -10,7 +10,7 @@ from app.config import settings
 from app.services.exchange_broker_service import exchange_broker_service
 
 class PaperBrokerService:
-    def __init__(self, initial_cash: float = 100000.0, storage_path: Optional[str] = None):
+    def __init__(self, initial_cash: float = 200.0, storage_path: Optional[str] = None):
         self.initial_cash = initial_cash
         self.cash = initial_cash
         self.positions: Dict[str, PaperPosition] = {}
@@ -292,11 +292,14 @@ class PaperBrokerService:
             self._save_state()
 
     def reset(self, initial_cash: Optional[float] = None):
-        self.initial_cash = initial_cash or settings.initial_cash
+        if initial_cash is not None:
+            self.initial_cash = initial_cash
+        elif not getattr(self, "initial_cash", None):
+            self.initial_cash = settings.initial_cash
         self.cash = self.initial_cash
         self.positions.clear()
         self.trades_history.clear()
         self.realized_pnl = 0.0
         self._save_state()
 
-paper_broker = PaperBrokerService(storage_path=settings.paper_broker_storage_path)
+paper_broker = PaperBrokerService(initial_cash=settings.initial_cash, storage_path=settings.paper_broker_storage_path)

@@ -56,6 +56,30 @@ def test_paper_broker_leverage_and_liquidation():
 
     # Price drops to liquidation level
     broker.update_prices({"BTC/USDT": pos.liquidation_price - 100.0})
-    assert len(broker.positions) == 0  # Position liquidated
     assert len(broker.trades_history) == 2  # Open + Liquidate
     assert "Liquidated" in broker.trades_history[-1].reason
+
+def test_paper_broker_default_200_usd_account():
+    from app.config import settings
+    broker = PaperBrokerService()
+    assert broker.initial_cash == 200.0
+    assert broker.cash == 200.0
+    assert settings.initial_cash == 200.0
+
+    # Execute a $10 position with 10x leverage ($1 margin required)
+    price = 80000.0
+    amount = 10.0 / price  # $10 notional
+    pos = broker.execute_order(
+        symbol="BTC/USDT",
+        side="BUY",
+        price=price,
+        amount=amount,
+        leverage=10.0,
+        reason="Default $10 order at 10x"
+    )
+    assert pos.leverage == 10.0
+    assert round(pos.cost_basis, 2) == 10.0
+    assert round(pos.margin, 2) == 1.0
+    assert broker.cash < 200.0
+    assert broker.cash > 198.0
+

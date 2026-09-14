@@ -48,7 +48,7 @@ def test_exchange_watch_urls_and_webhook():
 
 def test_paper_broker_disk_persistence():
     broker = PaperBrokerService(initial_cash=100000.0, storage_path=settings.paper_broker_storage_path)
-    broker.reset()
+    broker.reset(100000.0)
 
     # Execute trade with Binance Testnet broker routing
     pos = broker.execute_order(

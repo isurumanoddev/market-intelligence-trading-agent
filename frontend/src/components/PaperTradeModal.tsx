@@ -61,7 +61,7 @@ export const PaperTradeModal: React.FC<PaperTradeModalProps> = ({
   initialEntry,
   initialSl,
   initialTp,
-  initialLeverage = 5,
+  initialLeverage = 10,
   accuracyRating = null,
   portfolio,
   onExecute,
@@ -72,8 +72,8 @@ export const PaperTradeModal: React.FC<PaperTradeModalProps> = ({
   const [limitPrice, setLimitPrice] = useState<number>(initialCurrentPrice || 80000);
   
   const [brokerType, setBrokerType] = useState<"LOCAL" | "BINANCE_TESTNET" | "BYBIT_TESTNET">("LOCAL");
-  const [sizeUsd, setSizeUsd] = useState<number>(5000);
-  const [leverage, setLeverage] = useState<number>(initialLeverage || 5);
+  const [sizeUsd, setSizeUsd] = useState<number>(10);
+  const [leverage, setLeverage] = useState<number>(initialLeverage || 10);
   
   const [enableTp, setEnableTp] = useState<boolean>(true);
   const [tpPrice, setTpPrice] = useState<number>(0);
@@ -88,7 +88,7 @@ export const PaperTradeModal: React.FC<PaperTradeModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const availableCash = portfolio?.cash || 100000;
+  const availableCash = portfolio?.cash ?? 200;
   const activePrice = orderType === "MARKET" ? (initialCurrentPrice > 0 ? initialCurrentPrice : 80000) : limitPrice;
 
   useEffect(() => {
@@ -557,17 +557,17 @@ export const PaperTradeModal: React.FC<PaperTradeModalProps> = ({
               <span className="absolute left-2.5 top-2 text-slate-500 font-bold">$</span>
               <input
                 type="number"
-                step="100"
-                min="50"
+                step="1"
+                min="1"
                 value={sizeUsd}
                 onChange={(e) => setSizeUsd(Number(e.target.value))}
                 className="w-full bg-slate-900 border border-slate-700 rounded pl-6 pr-3 py-1.5 text-white font-bold"
-                placeholder="5000"
+                placeholder="10"
               />
             </div>
 
             <div className="flex items-center gap-1.5 pt-0.5">
-              {[1000, 2500, 5000, 10000].map((amt) => (
+              {[10, 25, 50, 100].map((amt) => (
                 <button
                   key={amt}
                   type="button"
@@ -578,7 +578,7 @@ export const PaperTradeModal: React.FC<PaperTradeModalProps> = ({
                       : "bg-slate-900/70 border-slate-800 text-slate-400 hover:text-white"
                   }`}
                 >
-                  ${(amt / 1000).toFixed(0)}k
+                  ${amt}
                 </button>
               ))}
               <button

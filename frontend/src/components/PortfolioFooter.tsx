@@ -17,8 +17,8 @@ export const PortfolioFooter: React.FC<PortfolioFooterProps> = ({
   onResetPortfolio,
   onOpenTradeModal,
 }) => {
-  const cash = portfolio?.cash || 100000;
-  const equity = portfolio?.equity || 100000;
+  const cash = portfolio?.cash ?? 200;
+  const equity = portfolio?.equity ?? 200;
   const pnl = portfolio?.total_pnl || 0;
   const pnlPct = portfolio?.total_pnl_pct || 0;
   const positions = portfolio?.positions || [];
@@ -31,7 +31,7 @@ export const PortfolioFooter: React.FC<PortfolioFooterProps> = ({
           <Briefcase className="w-4 h-4 text-cyan-400" />
           <span className="font-bold text-white text-xs tracking-wider">PAPER TRADING SIMULATOR</span>
           <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#171f30] text-slate-400 font-mono">
-            Virtual $100k Margin Account
+            Virtual $200 Margin Account
           </span>
           {onOpenTradeModal && (
             <button

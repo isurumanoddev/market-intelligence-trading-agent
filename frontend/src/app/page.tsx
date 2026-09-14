@@ -273,7 +273,7 @@ export default function DashboardPage() {
     const side = customSide || (dec?.action.includes("SELL") ? "SELL" : "BUY");
     const sl = customSl !== undefined ? customSl : dec?.stop_loss;
     const tp = customTp !== undefined ? customTp : dec?.take_profit_1;
-    const tradeValue = 5000.0;
+    const tradeValue = 10.0;
     const amount = Number((tradeValue / currentP).toFixed(6));
 
     setIsExecutingTrade(true);
@@ -310,7 +310,7 @@ export default function DashboardPage() {
 
   // Reset Portfolio
   const handleResetPortfolio = async () => {
-    if (confirm("Reset paper trading portfolio balance to $100,000?")) {
+    if (confirm("Reset paper trading portfolio balance to $200?")) {
       await resetPortfolio();
       await loadPortfolioData();
     }
@@ -558,7 +558,7 @@ export default function DashboardPage() {
         initialEntry={tradeModalParams.entry}
         initialSl={tradeModalParams.sl}
         initialTp={tradeModalParams.tp}
-        initialLeverage={tradeModalParams.leverage || 5}
+        initialLeverage={tradeModalParams.leverage || 10}
         accuracyRating={analysis?.accuracy_rating || null}
         portfolio={portfolio}
         onExecute={handleModalExecute}

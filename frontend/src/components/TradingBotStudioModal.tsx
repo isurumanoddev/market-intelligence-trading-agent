@@ -107,7 +107,7 @@ export function TradingBotStudioModal({ isOpen, onClose, currentSymbol }: Tradin
   // Bot Config Form
   const [botStrategy, setBotStrategy] = useState("TECHNICAL_MOMENTUM");
   const [minConviction, setMinConviction] = useState(70);
-  const [tradeSizeUsd, setTradeSizeUsd] = useState(2000);
+  const [tradeSizeUsd, setTradeSizeUsd] = useState(10);
   const [maxPositions, setMaxPositions] = useState(3);
   const [trailingEnabled, setTrailingEnabled] = useState(true);
   const [trailingPct, setTrailingPct] = useState(1.5);
@@ -877,7 +877,7 @@ export function TradingBotStudioModal({ isOpen, onClose, currentSymbol }: Tradin
                     <label className="text-[10px] text-slate-400 block mb-1 uppercase">Position Size ($ USD)</label>
                     <input
                       type="number"
-                      step="500"
+                      step="1"
                       value={tradeSizeUsd}
                       onChange={(e) => setTradeSizeUsd(Number(e.target.value))}
                       className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-white"

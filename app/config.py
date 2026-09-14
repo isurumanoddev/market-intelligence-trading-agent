@@ -26,7 +26,7 @@ class Settings(BaseModel):
     ]
     
     # Risk Management Defaults
-    initial_cash: float = 100000.0
+    initial_cash: float = 200.0
     max_risk_per_trade_pct: float = 2.0  # Max 2% risk of total portfolio per trade
     default_stop_loss_pct: float = 2.5
     default_take_profit_pct: float = 5.0
