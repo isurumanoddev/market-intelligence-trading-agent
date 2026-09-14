@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { 
   BotConfig, 
   BotStats, 
@@ -9,8 +9,10 @@ import {
   BacktestRequest, 
   BacktestResult, 
   BacktestTrade, 
-  EquityPoint 
+  EquityPoint,
+  CoinInfo
 } from "@/types/market";
+import { fetchCoins } from "@/lib/api";
 
 interface TradingBotStudioModalProps {
   isOpen: boolean;
@@ -23,6 +25,57 @@ export function TradingBotStudioModal({ isOpen, onClose, currentSymbol }: Tradin
   
   // ------------------ Backtest State ------------------
   const [btSymbol, setBtSymbol] = useState(currentSymbol || "BTC/USDT");
+  const [allCoins, setAllCoins] = useState<CoinInfo[]>([]);
+
+  useEffect(() => {
+    if (isOpen && allCoins.length === 0) {
+      fetchCoins({ limit: 120 }).then((res) => {
+        if (res && res.coins && res.coins.length > 0) {
+          setAllCoins(res.coins);
+        }
+      }).catch(() => {});
+    }
+  }, [isOpen, allCoins.length]);
+
+  const categorizedCoins = useMemo(() => {
+    if (!allCoins || allCoins.length === 0) {
+      return [
+        { label: "🔥 Top Volume Majors", coins: [
+          { symbol: "BTC/USDT", name: "Bitcoin" },
+          { symbol: "ETH/USDT", name: "Ethereum" },
+          { symbol: "SOL/USDT", name: "Solana" },
+          { symbol: "BNB/USDT", name: "BNB" },
+          { symbol: "XRP/USDT", name: "XRP" },
+          { symbol: "SUI/USDT", name: "Sui" },
+        ]},
+        { label: "🐕 Memes", coins: [
+          { symbol: "DOGE/USDT", name: "Dogecoin" },
+          { symbol: "PEPE/USDT", name: "Pepe" },
+          { symbol: "WIF/USDT", name: "dogwifhat" },
+          { symbol: "BONK/USDT", name: "Bonk" },
+        ]},
+      ];
+    }
+    const categories: { [k: string]: { label: string; coins: CoinInfo[] } } = {
+      L1_L2: { label: "⚡ Layer 1 / Layer 2", coins: [] },
+      MEME: { label: "🐕 Memes & High Volatility", coins: [] },
+      AI_DEPIN: { label: "🤖 AI & DePIN", coins: [] },
+      DEFI: { label: "💎 DeFi & DEX Protocols", coins: [] },
+      RWA_INFRA: { label: "🏛️ RWA & Infrastructure", coins: [] },
+      GAMING: { label: "🎮 Gaming & Metaverse", coins: [] },
+    };
+    const topVolume: CoinInfo[] = [];
+    allCoins.forEach((c) => {
+      if (c.is_high_volume) topVolume.push(c);
+      if (categories[c.category]) {
+        categories[c.category].coins.push(c);
+      }
+    });
+    return [
+      { label: "🔥 Top Volume (Hot)", coins: topVolume },
+      ...Object.values(categories).filter((cat) => cat.coins.length > 0),
+    ];
+  }, [allCoins]);
   const [btStrategy, setBtStrategy] = useState<
     | "EMA_RSI"
     | "MACD"
@@ -313,12 +366,17 @@ export function TradingBotStudioModal({ isOpen, onClose, currentSymbol }: Tradin
                   <select
                     value={btSymbol}
                     onChange={(e) => setBtSymbol(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-white font-bold"
+                    className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-white font-bold text-xs"
                   >
-                    <option value="BTC/USDT">BTC/USDT</option>
-                    <option value="ETH/USDT">ETH/USDT</option>
-                    <option value="SOL/USDT">SOL/USDT</option>
-                    <option value="XRP/USDT">XRP/USDT</option>
+                    {categorizedCoins.map((cat) => (
+                      <optgroup key={cat.label} label={cat.label} className="bg-slate-900 text-slate-300 font-bold">
+                        {cat.coins.map((c) => (
+                          <option key={c.symbol} value={c.symbol} className="bg-[#0c101d] text-white font-mono">
+                            {c.symbol} - {c.name}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))}
                   </select>
                 </div>
 
