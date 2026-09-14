@@ -22,7 +22,7 @@ class Settings(BaseModel):
     # Default settings
     default_exchange: str = os.getenv("DEFAULT_EXCHANGE", "kraken")
     default_symbols: List[str] = [
-        s.strip() for s in os.getenv("DEFAULT_SYMBOLS", "BTC/USDT,ETH/USDT,SOL/USDT,AAPL,NVDA").split(",") if s.strip()
+        s.strip() for s in os.getenv("DEFAULT_SYMBOLS", "BTC/USDT,ETH/USDT,SOL/USDT,DOGE/USDT,PEPE/USDT,SUI/USDT,XRP/USDT,NEAR/USDT,FET/USDT,AVAX/USDT,LINK/USDT,WIF/USDT,BNB/USDT").split(",") if s.strip()
     ]
     
     # Risk Management Defaults

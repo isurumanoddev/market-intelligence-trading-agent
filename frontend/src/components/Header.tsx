@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Sparkles, RefreshCw, Settings, Zap, GraduationCap, BookOpen } from "lucide-react";
+import { Sparkles, RefreshCw, Settings, Zap, GraduationCap, BookOpen, Flame, Search } from "lucide-react";
 
 interface HeaderProps {
   currentSymbol: string;
@@ -10,6 +10,7 @@ interface HeaderProps {
   onOpenSettings: () => void;
   onOpenTradingBot?: () => void;
   onOpenHelp?: () => void;
+  onOpenCoinSearch?: () => void;
   botStatusText?: string;
   refreshInterval: number;
   onChangeRefreshInterval: (interval: number) => void;
@@ -18,7 +19,7 @@ interface HeaderProps {
 }
 
 
-const DEFAULT_SYMBOLS = ["BTC/USDT", "ETH/USDT", "SOL/USDT", "AAPL", "NVDA", "TSLA"];
+const DEFAULT_SYMBOLS = ["BTC/USDT", "ETH/USDT", "SOL/USDT", "DOGE/USDT", "PEPE/USDT", "SUI/USDT", "XRP/USDT", "NEAR/USDT"];
 
 export const Header: React.FC<HeaderProps> = ({
   currentSymbol,
@@ -27,6 +28,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenSettings,
   onOpenTradingBot,
   onOpenHelp,
+  onOpenCoinSearch,
   botStatusText,
   refreshInterval,
   onChangeRefreshInterval,
@@ -64,17 +66,29 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Quick Symbols */}
         <div className="flex items-center gap-1.5 flex-wrap">
+          {/* Top 100+ Market Browser Button */}
+          {onOpenCoinSearch && (
+            <button
+              onClick={onOpenCoinSearch}
+              className="px-3 py-1 text-xs font-mono font-bold rounded flex items-center gap-1.5 bg-gradient-to-r from-cyan-600/30 via-blue-600/30 to-purple-600/30 hover:from-cyan-600/50 hover:to-blue-600/50 text-cyan-300 border border-cyan-500/50 shadow-md shadow-cyan-950/60 transition-all active:scale-95 group"
+              title="Search and trade across 100+ Top Market Cap & High Volume Cryptocurrency Pairs"
+            >
+              <Flame className="w-3.5 h-3.5 text-amber-400 fill-amber-400/30 group-hover:animate-pulse" />
+              <span>Top 100+ Coins</span>
+            </button>
+          )}
+
           {DEFAULT_SYMBOLS.map((sym) => (
             <button
               key={sym}
               onClick={() => onSelectSymbol(sym)}
-              className={`px-2.5 py-1 text-xs font-mono font-semibold rounded transition-all ${
+              className={`px-2 py-1 text-xs font-mono font-semibold rounded transition-all ${
                 currentSymbol === sym
                   ? "bg-blue-600 text-white shadow-md shadow-blue-500/30 border border-blue-400"
                   : "bg-[#171f30] text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800"
               }`}
             >
-              {sym}
+              {sym.split("/")[0]}
             </button>
           ))}
 

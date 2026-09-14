@@ -22,7 +22,8 @@ import {
   Globe,
   Radio
 } from "lucide-react";
-import { PortfolioState, AccuracySetupRating } from "@/types/market";
+import { PortfolioState, AccuracySetupRating, CoinInfo } from "@/types/market";
+import { fetchCoins } from "@/lib/api";
 
 interface PaperTradeModalProps {
   isOpen: boolean;
@@ -78,6 +79,7 @@ export const PaperTradeModal: React.FC<PaperTradeModalProps> = ({
   const [tpPrice, setTpPrice] = useState<number>(0);
   const [enableSl, setEnableSl] = useState<boolean>(true);
   const [slPrice, setSlPrice] = useState<number>(0);
+  const [allCoins, setAllCoins] = useState<CoinInfo[]>([]);
 
   const [showWebhook, setShowWebhook] = useState<boolean>(false);
   const [copiedWebhook, setCopiedWebhook] = useState<boolean>(false);
@@ -116,8 +118,51 @@ export const PaperTradeModal: React.FC<PaperTradeModalProps> = ({
         setLeverage(initialLeverage);
       }
       setErrorMsg(null);
+
+      fetchCoins({ limit: 120 }).then((res) => {
+        if (res && res.coins && res.coins.length > 0) {
+          setAllCoins(res.coins);
+        }
+      }).catch(() => {});
     }
   }, [isOpen, initialSymbol, initialSide, initialCurrentPrice, initialTp, initialSl, initialLeverage]);
+
+  const categorizedCoins = useMemo(() => {
+    if (!allCoins || allCoins.length === 0) {
+      return [
+        { label: "🔥 Top Volume Majors", coins: [
+          { symbol: "BTC/USDT", name: "Bitcoin" },
+          { symbol: "ETH/USDT", name: "Ethereum" },
+          { symbol: "SOL/USDT", name: "Solana" },
+          { symbol: "BNB/USDT", name: "BNB" },
+          { symbol: "XRP/USDT", name: "XRP" },
+          { symbol: "SUI/USDT", name: "Sui" },
+        ]},
+        { label: "🐕 Memes", coins: [
+          { symbol: "DOGE/USDT", name: "Dogecoin" },
+          { symbol: "PEPE/USDT", name: "Pepe" },
+          { symbol: "WIF/USDT", name: "dogwifhat" },
+          { symbol: "BONK/USDT", name: "Bonk" },
+        ]}
+      ];
+    }
+
+    const majors = allCoins.filter(c => c.is_high_volume && ["BTC", "ETH", "SOL", "BNB", "XRP", "SUI", "AVAX", "NEAR"].includes(c.base));
+    const memes = allCoins.filter(c => c.category === "MEME" || c.tags?.includes("MEME"));
+    const ai = allCoins.filter(c => c.category === "AI_DEPIN" || c.tags?.includes("AI"));
+    const l1 = allCoins.filter(c => (c.category === "L1_L2" || c.tags?.includes("L1")) && !majors.some(m => m.symbol === c.symbol));
+    const defi = allCoins.filter(c => c.category === "DEFI" || c.category === "RWA_INFRA");
+    const others = allCoins.filter(c => !majors.includes(c) && !memes.includes(c) && !ai.includes(c) && !l1.includes(c) && !defi.includes(c));
+
+    return [
+      { label: "🔥 High Volume & Majors", coins: majors },
+      { label: "🐕 Meme Coins", coins: memes },
+      { label: "🤖 AI & DePIN Tokens", coins: ai },
+      { label: "⚡ Layer 1 & 2 Blockchains", coins: l1 },
+      { label: "🏦 Blue-Chip DeFi & RWA", coins: defi },
+      { label: "🎮 Gaming & Ecosystems", coins: others }
+    ].filter(g => g.coins.length > 0);
+  }, [allCoins]);
 
   const calculations = useMemo(() => {
     const entry = activePrice > 0 ? activePrice : 1.0;
@@ -403,10 +448,19 @@ export const PaperTradeModal: React.FC<PaperTradeModalProps> = ({
               <select
                 value={symbol}
                 onChange={(e) => setSymbol(e.target.value)}
-                className="bg-slate-800 border border-slate-700 text-white font-bold rounded px-2 py-1 text-xs"
+                className="bg-slate-800 border border-slate-700 text-white font-bold rounded px-2 py-1 text-xs max-w-[210px] outline-none focus:border-cyan-400"
               >
-                {POPULAR_SYMBOLS.map((s) => (
-                  <option key={s} value={s}>{s}</option>
+                {!allCoins.some(c => c.symbol.toUpperCase() === symbol.toUpperCase()) && (
+                  <option value={symbol}>{symbol}</option>
+                )}
+                {categorizedCoins.map((group) => (
+                  <optgroup key={group.label} label={group.label} className="bg-slate-900 text-cyan-300 font-bold">
+                    {group.coins.map((c) => (
+                      <option key={c.symbol} value={c.symbol} className="bg-[#0b101e] text-white font-normal">
+                        {c.symbol} — {c.name}
+                      </option>
+                    ))}
+                  </optgroup>
                 ))}
               </select>
               <span className="text-[10px] text-slate-400">PERPETUAL</span>

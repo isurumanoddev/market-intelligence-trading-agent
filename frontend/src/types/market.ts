@@ -1,3 +1,18 @@
+export interface CoinInfo {
+  symbol: string;
+  name: string;
+  base: string;
+  quote: string;
+  category: "L1_L2" | "MEME" | "AI_DEPIN" | "DEFI" | "RWA_INFRA" | "GAMING" | "OTHER";
+  market_cap_rank: number;
+  is_high_volume: boolean;
+  tv_symbol: string;
+  tags?: string[];
+  price?: number;
+  change_24h_pct?: number;
+  volume_24h_usd?: number;
+}
+
 export interface OrderBookLevel {
   price: number;
   amount: number;

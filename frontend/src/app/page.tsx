@@ -15,6 +15,7 @@ import { TradingBotStudioModal } from "@/components/TradingBotStudioModal";
 import { LLMPredictionPanel } from "@/components/LLMPredictionPanel";
 import { HelpAcademyModal } from "@/components/HelpAcademyModal";
 import { PaperTradeModal } from "@/components/PaperTradeModal";
+import { CoinSearchModal } from "@/components/CoinSearchModal";
 import {
   fetchAnalysis,
   fetchCandles,
@@ -87,6 +88,7 @@ export default function DashboardPage() {
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [botStatusText, setBotStatusText] = useState<string>("STOPPED");
   const [isTradeModalOpen, setIsTradeModalOpen] = useState(false);
+  const [isCoinSearchOpen, setIsCoinSearchOpen] = useState(false);
   const [tradeModalParams, setTradeModalParams] = useState<{
     side?: "BUY" | "SELL";
     entry?: number;
@@ -343,6 +345,7 @@ export default function DashboardPage() {
         onOpenSettings={() => setIsSettingsOpen(true)}
         onOpenTradingBot={() => setIsTradingBotOpen(true)}
         onOpenHelp={() => setIsHelpOpen(true)}
+        onOpenCoinSearch={() => setIsCoinSearchOpen(true)}
         botStatusText={botStatusText}
         hasGeminiKey={Boolean(settings?.has_gemini_key)}
         isLoading={isAnalysisLoading || isCandlesLoading || isLlmLoading}
@@ -559,6 +562,17 @@ export default function DashboardPage() {
         accuracyRating={analysis?.accuracy_rating || null}
         portfolio={portfolio}
         onExecute={handleModalExecute}
+      />
+
+      {/* Coin Search & Top 100+ Market Watch Modal */}
+      <CoinSearchModal
+        isOpen={isCoinSearchOpen}
+        onClose={() => setIsCoinSearchOpen(false)}
+        onSelectCoin={(sym) => {
+          setCurrentSymbol(sym);
+          setCandles(generateInitialCandles(sym, currentTimeframe));
+        }}
+        currentSymbol={currentSymbol}
       />
     </div>
   );

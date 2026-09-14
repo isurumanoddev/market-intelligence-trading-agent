@@ -1,5 +1,6 @@
 import {
   FullAnalysisData,
+  CoinInfo,
   Candle,
   PortfolioState,
   SettingsData,
@@ -172,4 +173,40 @@ export async function fetchTradingViewWebhookTemplate(params: {
   });
   if (!res.ok) return null;
   return res.json();
+}
+
+export async function fetchCoins(params?: {
+  category?: string;
+  search?: string;
+  sort_by?: string;
+  limit?: number;
+}): Promise<{ status: string; total: number; coins: CoinInfo[] }> {
+  try {
+    const query = new URLSearchParams();
+    if (params?.category) query.set("category", params.category);
+    if (params?.search) query.set("search", params.search);
+    if (params?.sort_by) query.set("sort_by", params.sort_by);
+    if (params?.limit) query.set("limit", params.limit.toString());
+
+    const res = await fetch(`${API_BASE}/market/coins?${query.toString()}`, {
+      cache: "no-store",
+    });
+    if (!res.ok) return { status: "error", total: 0, coins: [] };
+    return res.json();
+  } catch {
+    return { status: "error", total: 0, coins: [] };
+  }
+}
+
+export async function fetchTopVolumeCoins(limit: number = 20): Promise<CoinInfo[]> {
+  try {
+    const res = await fetch(`${API_BASE}/market/top-volume?limit=${limit}`, {
+      cache: "no-store",
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.coins || [];
+  } catch {
+    return [];
+  }
 }

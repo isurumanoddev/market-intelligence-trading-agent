@@ -20,6 +20,7 @@ from app.services.telegram_service import telegram_service
 from app.services.llm_predictor import llm_predictor
 from app.services.tradingview_service import tradingview_service
 from app.services.exchange_broker_service import exchange_broker_service
+from app.services.coin_catalog_service import coin_catalog_service
 
 router = APIRouter()
 
@@ -51,6 +52,40 @@ class SettingsUpdateRequest(BaseModel):
     default_exchange: Optional[str] = None
     max_risk_per_trade_pct: Optional[float] = None
     max_spread_pct: Optional[float] = None
+
+@router.get("/market/coins")
+async def get_market_coins(
+    category: Optional[str] = Query(default=None),
+    search: Optional[str] = Query(default=None),
+    sort_by: str = Query(default="rank"),
+    limit: int = Query(default=100, ge=1, le=200)
+):
+    try:
+        coins = coin_catalog_service.get_coins(
+            category=category,
+            search=search,
+            sort_by=sort_by,
+            limit=limit
+        )
+        return {
+            "status": "success",
+            "total": len(coins),
+            "coins": coins
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/market/top-volume")
+async def get_top_volume_coins(limit: int = Query(default=20, ge=1, le=50)):
+    try:
+        coins = coin_catalog_service.get_top_volume_coins(limit=limit)
+        return {
+            "status": "success",
+            "total": len(coins),
+            "coins": coins
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/market/ticker")
 async def get_ticker(symbol: str = Query(default="BTC/USDT")):
