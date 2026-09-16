@@ -24,7 +24,8 @@ import {
   Check,
   Copy,
   Crosshair,
-  MessageSquare
+  MessageSquare,
+  AlertTriangle
 } from "lucide-react";
 
 declare global {
@@ -366,15 +367,18 @@ export const TradingViewAdvancedChart: React.FC<TradingViewAdvancedChartProps> =
     });
 
     // Strategy 3: Stochastic RSI Double-Bottom Turnaround
-    const stochBuy = stochK < 30 && stochK >= stochD;
-    const stochSell = stochK > 70 && stochK <= stochD;
+    const isStochOverbought = stochK > 75 || stochD > 75;
+    const isStochOversold = stochK < 25 || stochD < 25;
+    const stochBuy = isStochOversold || (stochK < 50 && stochK >= stochD);
+    const stochSell = isStochOverbought || (stochK > 50 && stochK <= stochD);
+    const stochType: "BUY" | "SELL" = isStochOverbought ? "SELL" : isStochOversold ? "BUY" : (stochK >= stochD ? "BUY" : "SELL");
     strats.push({
       id: "stoch_rsi_reversal",
       name: "Stochastic RSI Reversal",
       category: "MOMENTUM",
-      type: stochBuy ? "BUY" : stochSell ? "SELL" : (stochK >= 50 ? "BUY" : "SELL"),
+      type: stochType,
       trigger: `Stoch %K: ${stochK.toFixed(0)} / %D: ${stochD.toFixed(0)}`,
-      rule: stochBuy ? "Oversold double-bottom cross from < 30. High-accuracy swing entry." : stochSell ? "Overbought cross down from > 70. Tighten trailing stops." : "Oscillator trend continuation.",
+      rule: isStochOversold ? "Oversold turnaround zone (< 25). Favorable swing entry." : isStochOverbought ? "Overbought exhaustion zone (> 75). Reversal downward risk." : (stochK >= stochD ? "Bullish momentum cross." : "Bearish momentum cross."),
       winRate: 69.2,
       confidence: 79,
       timeframe: activeInterval,
@@ -383,15 +387,18 @@ export const TradingViewAdvancedChart: React.FC<TradingViewAdvancedChartProps> =
     // Strategy 4: VWAP Standard Deviation Band Mean Reversion
     const vwapUpper1 = indicators?.vwap_upper_1 || vwap * 1.015;
     const vwapLower1 = indicators?.vwap_lower_1 || vwap * 0.985;
+    const isDowntrendBreakdown = (ema20 < ema50 || lastPrice < vwap) && adxVal > 28;
+    const isUptrendExpansion = (ema20 > ema50 || lastPrice > vwap) && adxVal > 28;
     const vwapBuy = lastPrice <= vwapLower1;
     const vwapSell = lastPrice >= vwapUpper1;
+    const vwapType: "BUY" | "SELL" = vwapBuy ? (isDowntrendBreakdown ? "SELL" : "BUY") : vwapSell ? (isUptrendExpansion ? "BUY" : "SELL") : (lastPrice >= vwap ? "BUY" : "SELL");
     strats.push({
       id: "vwap_bands",
       name: "VWAP Multi-Sigma Band Squeeze",
       category: "REVERSION",
-      type: vwapBuy ? "BUY" : vwapSell ? "SELL" : (lastPrice >= vwap ? "BUY" : "SELL"),
+      type: vwapType,
       trigger: vwapBuy ? "Price <= VWAP -1.25σ Lower Band" : vwapSell ? "Price >= VWAP +1.25σ Upper Band" : "Price near VWAP Equilibrium",
-      rule: vwapBuy ? "Institutional discount band stretch. High-probability snapback to VWAP median." : vwapSell ? "Institutional premium band stretch. Selling resistance zone." : "Equilibrium trading.",
+      rule: vwapBuy ? (isDowntrendBreakdown ? "Bearish trend breakdown stretching below discount band." : "Institutional discount stretch. Snapback to VWAP median.") : vwapSell ? (isUptrendExpansion ? "Bullish expansion running above upper band." : "Institutional premium stretch. Resistance zone.") : "Equilibrium trading.",
       winRate: 71.5,
       confidence: 82,
       timeframe: "Intraday / 1h",
@@ -439,13 +446,24 @@ export const TradingViewAdvancedChart: React.FC<TradingViewAdvancedChartProps> =
     });
 
     // Strategy 8: RSI Pullback & Divergence
+    const isTrendBearish = ema20 < ema50 || lastPrice < vwap;
+    let rsiType: "BUY" | "SELL" = "SELL";
+    if (rsiVal < 30) {
+      rsiType = "BUY";
+    } else if (rsiVal < 50) {
+      rsiType = isTrendBearish ? "SELL" : "BUY";
+    } else if (rsiVal > 70) {
+      rsiType = "SELL";
+    } else {
+      rsiType = isTrendBearish ? "SELL" : "BUY";
+    }
     strats.push({
       id: "rsi_pullback",
       name: "RSI Momentum Pullback (14)",
       category: "MOMENTUM",
-      type: rsiVal < 40 ? "BUY" : rsiVal > 65 ? "SELL" : (rsiVal >= 50 ? "BUY" : "SELL"),
+      type: rsiType,
       trigger: `RSI Level: ${rsiVal.toFixed(1)}`,
-      rule: rsiVal < 40 ? "RSI oversold discount. Favorable risk-to-reward long entry." : rsiVal > 65 ? "RSI overbought. Buyer exhaustion alert." : "Neutral momentum drift.",
+      rule: rsiVal < 30 ? "Extreme oversold discount bounce candidate." : rsiVal < 50 ? (isTrendBearish ? "Bearish momentum continuation below 50." : "Favorable risk-to-reward pullback.") : rsiVal > 70 ? "RSI overbought. Buyer exhaustion alert." : "Bullish momentum follow-through.",
       winRate: 66.1,
       confidence: 76,
       timeframe: activeInterval,
@@ -494,7 +512,19 @@ export const TradingViewAdvancedChart: React.FC<TradingViewAdvancedChartProps> =
     const total = activeStrategies.length || 1;
     const buyPct = Math.round((buyCount / total) * 100);
     const sellPct = Math.round((sellCount / total) * 100);
-    const overallVerdict = buyCount >= 6 ? "STRONG BUY" : buyCount >= 4 ? "MODERATE BUY" : sellCount >= 6 ? "STRONG SELL" : "NEUTRAL / CHOP";
+
+    let overallVerdict = "HIGH CONFLICT / CHOP";
+    if (buyCount >= 7) {
+      overallVerdict = "STRONG BUY";
+    } else if (buyCount >= 6 && buyCount > sellCount) {
+      overallVerdict = "MODERATE BUY";
+    } else if (sellCount >= 7) {
+      overallVerdict = "STRONG SELL";
+    } else if (sellCount >= 6 && sellCount > buyCount) {
+      overallVerdict = "MODERATE SELL";
+    } else {
+      overallVerdict = "HIGH CONFLICT / CHOP";
+    }
 
     return { buyCount, sellCount, total, buyPct, sellPct, overallVerdict };
   }, [activeStrategies]);
@@ -508,13 +538,8 @@ export const TradingViewAdvancedChart: React.FC<TradingViewAdvancedChartProps> =
   // 3. Institutional Best Trading Entry Points (Optimal Trade Entry - OTE Engine)
   const bestEntrySetup = useMemo(() => {
     let side: "BUY" | "SELL" = "BUY";
-    if (signalMode === "LONG") {
-      side = "BUY";
-    } else if (signalMode === "SHORT") {
-      side = "SELL";
-    } else {
-      side = strategyStats.buyCount >= strategyStats.sellCount ? "BUY" : "SELL";
-    }
+    let isConflicted = false;
+    let warning: string | null = null;
 
     const rsiVal = typeof indicators?.rsi === "number" ? indicators.rsi : 50;
     const ema20 = indicators?.ema_20 || lastPrice;
@@ -523,6 +548,58 @@ export const TradingViewAdvancedChart: React.FC<TradingViewAdvancedChartProps> =
     const bbLower = indicators?.bb_lower || lastPrice * 0.98;
     const bbUpper = indicators?.bb_upper || lastPrice * 1.02;
     const stDir = indicators?.supertrend_direction || "BULLISH";
+
+    if (signalMode === "LONG") {
+      side = "BUY";
+      if (confluenceScore.dominantBias === "BEARISH" && confluenceScore.confidencePct >= 65) {
+        warning = `⚠️ CONTRARIAN LONG WARNING: Trading against ${confluenceScore.bear} Bearish Indicators (${confluenceScore.confidencePct}% Bearish Consensus). High liquidation risk!`;
+      }
+    } else if (signalMode === "SHORT") {
+      side = "SELL";
+      if (confluenceScore.dominantBias === "BULLISH" && confluenceScore.confidencePct >= 65) {
+        warning = `⚠️ CONTRARIAN SHORT WARNING: Trading against ${confluenceScore.bull} Bullish Indicators (${confluenceScore.confidencePct}% Bullish Consensus). High liquidation risk!`;
+      }
+    } else {
+      // AI AUTO CONFLUENCE SYNTHESIS ENGINE
+      let score = 0;
+
+      // 1. AI Master Arbiter vote (-3 to +3)
+      if (decision) {
+        if (decision.action.includes("BUY")) {
+          score += decision.conviction >= 70 ? 3 : 2;
+        } else if (decision.action.includes("SELL")) {
+          score -= decision.conviction >= 70 ? 3 : 2;
+        }
+      }
+
+      // 2. 12-Indicator Confluence Consensus (-3 to +3)
+      if (confluenceScore.dominantBias === "BULLISH") {
+        score += confluenceScore.confidencePct >= 65 ? 3 : 2;
+      } else if (confluenceScore.dominantBias === "BEARISH") {
+        score -= confluenceScore.confidencePct >= 65 ? 3 : 2;
+      }
+
+      // 3. Strategy votes difference (-2 to +2)
+      const stratDiff = strategyStats.buyCount - strategyStats.sellCount;
+      if (stratDiff >= 2) score += 2;
+      else if (stratDiff <= -2) score -= 2;
+      else score += stratDiff;
+
+      // 4. Trend & Benchmark structure (-2 to +2)
+      if (ema20 > ema50 && lastPrice >= vwap) score += 2;
+      else if (ema20 < ema50 && lastPrice < vwap) score -= 2;
+
+      if (score >= 2) {
+        side = "BUY";
+      } else if (score <= -2) {
+        side = "SELL";
+      } else {
+        // Tied or close conflict: follow dominant indicator bias or AI arbiter
+        side = (confluenceScore.bear > confluenceScore.bull || (decision && decision.action.includes("SELL"))) ? "SELL" : "BUY";
+        isConflicted = true;
+        warning = "⚠️ LOW CONFLUENCE / HIGH CHOP: Indicators and strategies are split. Capital preservation mode advised (wait for breakout).";
+      }
+    }
 
     const confluenceReasons: string[] = [];
 
@@ -586,8 +663,8 @@ export const TradingViewAdvancedChart: React.FC<TradingViewAdvancedChartProps> =
       if (vwap > 0 && lastPrice >= vwap * 0.99) {
         confluenceReasons.push("VWAP Upper Premium Exhaustion");
       }
-      if (rsiVal >= 54) {
-        confluenceReasons.push(`RSI Overbought Momentum (${rsiVal.toFixed(1)})`);
+      if (rsiVal >= 54 || (rsiVal <= 40 && ema20 < ema50)) {
+        confluenceReasons.push(`Bearish Momentum Alignment (${rsiVal.toFixed(1)})`);
       }
       if (stDir === "BEARISH") {
         confluenceReasons.push("Supertrend Red Trailing Resistance");
@@ -622,8 +699,17 @@ export const TradingViewAdvancedChart: React.FC<TradingViewAdvancedChartProps> =
     const rewardPct1 = Number(((rewardAmt1 / activeEntry) * 100).toFixed(2));
     const rewardPct2 = Number(((rewardAmt2 / activeEntry) * 100).toFixed(2));
 
-    const winExpectancy = accuracyRating ? accuracyRating.win_rate_expectancy : (side === "BUY" ? 82 : 79);
-    const grade = accuracyRating ? accuracyRating.grade : (winExpectancy >= 80 ? "A+" : "A");
+    let winExpectancy = accuracyRating ? accuracyRating.win_rate_expectancy : (side === "BUY" ? 82 : 79);
+    let grade = accuracyRating ? accuracyRating.grade : (winExpectancy >= 80 ? "A+" : "A");
+
+    // Dynamic penalty if user manually forces counter-trend trade against 12 indicators:
+    if (warning && warning.includes("CONTRARIAN")) {
+      winExpectancy = Math.min(winExpectancy, 48.5);
+      grade = "C";
+    } else if (isConflicted) {
+      winExpectancy = Math.min(winExpectancy, 62.0);
+      grade = "B";
+    }
 
     return {
       side,
@@ -643,6 +729,8 @@ export const TradingViewAdvancedChart: React.FC<TradingViewAdvancedChartProps> =
       winExpectancy,
       grade,
       isLong: side === "BUY",
+      warning,
+      isConflicted,
       // Backwards compatibility with activeTradePlan
       entry: activeEntry,
       sl: stopLoss,
@@ -652,7 +740,7 @@ export const TradingViewAdvancedChart: React.FC<TradingViewAdvancedChartProps> =
       lossPct: riskPct,
       label: side === "BUY" ? "LONG POSITION" : "SHORT POSITION",
     };
-  }, [signalMode, entryType, strategyStats, indicators, decision, lastPrice, accuracyRating]);
+  }, [signalMode, entryType, strategyStats, indicators, decision, lastPrice, accuracyRating, confluenceScore]);
 
   // Alias activeTradePlan to bestEntrySetup
   const activeTradePlan = bestEntrySetup;
@@ -1444,7 +1532,11 @@ plotshape(entryCondition, title="Best Entry Signal", shape=${isLong ? "shape.tri
                   <span className={`px-1.5 py-0.2 rounded text-[9px] font-black border ${
                     bestEntrySetup.grade === "A+"
                       ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
-                      : "bg-cyan-500/20 text-cyan-300 border-cyan-500/40"
+                      : bestEntrySetup.grade === "A"
+                      ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/40"
+                      : bestEntrySetup.grade === "B"
+                      ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
+                      : "bg-rose-500/20 text-rose-300 border-rose-500/40"
                   }`}>
                     GRADE {bestEntrySetup.grade} ({bestEntrySetup.winExpectancy}%)
                   </span>
@@ -1457,6 +1549,54 @@ plotshape(entryCondition, title="Best Entry Signal", shape=${isLong ? "shape.tri
                   </button>
                 </div>
               </div>
+
+              {/* Direction Mode Switcher: AI CONFLUENCE vs MANUAL LONG vs MANUAL SHORT */}
+              <div className="grid grid-cols-3 gap-1 my-1.5 p-0.5 bg-slate-950/80 rounded-lg border border-slate-800 text-[10px]">
+                <button
+                  type="button"
+                  onClick={() => setSignalMode("AI")}
+                  className={`py-1 px-1.5 rounded font-bold transition-all text-center ${
+                    signalMode === "AI"
+                      ? "bg-purple-600 text-white shadow-sm"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                  title="Auto-selects optimal direction based on AI Master Arbiter & 12-Indicator Confluence"
+                >
+                  🤖 AI AUTO
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSignalMode("LONG")}
+                  className={`py-1 px-1.5 rounded font-bold transition-all text-center ${
+                    signalMode === "LONG"
+                      ? "bg-emerald-600 text-white shadow-sm"
+                      : "text-slate-400 hover:text-emerald-300"
+                  }`}
+                  title="Evaluate best pullback entry to LONG"
+                >
+                  🟢 LONG
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSignalMode("SHORT")}
+                  className={`py-1 px-1.5 rounded font-bold transition-all text-center ${
+                    signalMode === "SHORT"
+                      ? "bg-rose-600 text-white shadow-sm"
+                      : "text-slate-400 hover:text-rose-300"
+                  }`}
+                  title="Evaluate best retest entry to SHORT"
+                >
+                  🔴 SHORT
+                </button>
+              </div>
+
+              {/* Conflict / Risk Warning Alert Shield */}
+              {bestEntrySetup.warning && (
+                <div className="my-1.5 p-2 rounded-lg bg-amber-500/10 border border-amber-500/40 text-amber-300 text-[10px] flex items-start gap-1.5 animate-in fade-in duration-200">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-amber-400" />
+                  <span className="leading-tight font-sans font-medium">{bestEntrySetup.warning}</span>
+                </div>
+              )}
 
               {/* Entry Type Switcher */}
               <div className="grid grid-cols-2 gap-1.5 my-2">
@@ -1625,25 +1765,43 @@ plotshape(entryCondition, title="Best Entry Signal", shape=${isLong ? "shape.tri
 
         {/* VISUAL PRICE SCALE PINS (Right side of canvas for visual correlation with chart) */}
         <div className="absolute right-2 top-12 z-10 hidden sm:flex flex-col gap-1 items-end pointer-events-none select-none font-mono text-[10px]">
-          <div className="px-1.5 py-0.5 rounded bg-emerald-950/80 border border-emerald-500/50 text-emerald-300 shadow-sm backdrop-blur-sm">
-            TP2: ${bestEntrySetup.takeProfit2.toLocaleString()}
-          </div>
-          <div className="px-1.5 py-0.5 rounded bg-emerald-900/80 border border-emerald-400/50 text-emerald-200 shadow-sm backdrop-blur-sm">
-            TP1: ${bestEntrySetup.takeProfit1.toLocaleString()}
-          </div>
-          <div className={`px-2 py-0.5 rounded border font-bold shadow-md backdrop-blur-sm ${
-            bestEntrySetup.isLong
-              ? "bg-cyan-950/90 border-cyan-400 text-cyan-200"
-              : "bg-rose-950/90 border-rose-400 text-rose-200"
-          }`}>
-            ENTRY: ${bestEntrySetup.activeEntry.toLocaleString()}
-          </div>
-          <div className="px-1.5 py-0.5 rounded bg-slate-900/80 border border-slate-700 text-slate-300 shadow-sm backdrop-blur-sm">
-            MKT: ${lastPrice.toLocaleString()}
-          </div>
-          <div className="px-1.5 py-0.5 rounded bg-rose-950/80 border border-rose-500/50 text-rose-300 shadow-sm backdrop-blur-sm">
-            SL: ${bestEntrySetup.stopLoss.toLocaleString()}
-          </div>
+          {bestEntrySetup.isLong ? (
+            <>
+              <div className="px-1.5 py-0.5 rounded bg-emerald-950/80 border border-emerald-500/50 text-emerald-300 shadow-sm backdrop-blur-sm">
+                TP2: ${bestEntrySetup.takeProfit2.toLocaleString()}
+              </div>
+              <div className="px-1.5 py-0.5 rounded bg-emerald-900/80 border border-emerald-400/50 text-emerald-200 shadow-sm backdrop-blur-sm">
+                TP1: ${bestEntrySetup.takeProfit1.toLocaleString()}
+              </div>
+              <div className="px-2 py-0.5 rounded border font-bold shadow-md backdrop-blur-sm bg-cyan-950/90 border-cyan-400 text-cyan-200">
+                ENTRY: ${bestEntrySetup.activeEntry.toLocaleString()}
+              </div>
+              <div className="px-1.5 py-0.5 rounded bg-slate-900/80 border border-slate-700 text-slate-300 shadow-sm backdrop-blur-sm">
+                MKT: ${lastPrice.toLocaleString()}
+              </div>
+              <div className="px-1.5 py-0.5 rounded bg-rose-950/80 border border-rose-500/50 text-rose-300 shadow-sm backdrop-blur-sm">
+                SL: ${bestEntrySetup.stopLoss.toLocaleString()}
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="px-1.5 py-0.5 rounded bg-rose-950/80 border border-rose-500/50 text-rose-300 shadow-sm backdrop-blur-sm">
+                SL: ${bestEntrySetup.stopLoss.toLocaleString()}
+              </div>
+              <div className="px-2 py-0.5 rounded border font-bold shadow-md backdrop-blur-sm bg-rose-950/90 border-rose-400 text-rose-200">
+                ENTRY: ${bestEntrySetup.activeEntry.toLocaleString()}
+              </div>
+              <div className="px-1.5 py-0.5 rounded bg-slate-900/80 border border-slate-700 text-slate-300 shadow-sm backdrop-blur-sm">
+                MKT: ${lastPrice.toLocaleString()}
+              </div>
+              <div className="px-1.5 py-0.5 rounded bg-emerald-900/80 border border-emerald-400/50 text-emerald-200 shadow-sm backdrop-blur-sm">
+                TP1: ${bestEntrySetup.takeProfit1.toLocaleString()}
+              </div>
+              <div className="px-1.5 py-0.5 rounded bg-emerald-950/80 border border-emerald-500/50 text-emerald-300 shadow-sm backdrop-blur-sm">
+                TP2: ${bestEntrySetup.takeProfit2.toLocaleString()}
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>
