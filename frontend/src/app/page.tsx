@@ -101,6 +101,13 @@ export default function DashboardPage() {
   const [llmPrediction, setLlmPrediction] = useState<LLMPredictionResult | null>(null);
   const [isLlmLoading, setIsLlmLoading] = useState(false);
 
+  // Auto-dismiss transient connection warning after 6 seconds
+  useEffect(() => {
+    if (!errorMessage) return;
+    const timer = setTimeout(() => setErrorMessage(null), 6000);
+    return () => clearTimeout(timer);
+  }, [errorMessage]);
+
   const currentSymbolRef = useRef(currentSymbol);
   currentSymbolRef.current = currentSymbol;
   const currentTimeframeRef = useRef(currentTimeframe);
@@ -124,22 +131,24 @@ export default function DashboardPage() {
   // 2. Load Full Analysis independently
   const loadAnalysis = useCallback(async (sym: string) => {
     setIsAnalysisLoading(true);
-    setErrorMessage(null);
     try {
       const analysisRes = await fetchAnalysis(sym);
       if (analysisRes) {
         setAnalysis(analysisRes);
+        setErrorMessage(null);
       }
     } catch (err: any) {
       console.warn("Analysis load warning:", err);
-      // Non-blocking warning banner
-      if (!analysis) {
-        setErrorMessage(err.message || "Market analysis feed connecting...");
-      }
+      setAnalysis((prev) => {
+        if (!prev) {
+          setErrorMessage(err.message || "Market analysis feed connecting...");
+        }
+        return prev;
+      });
     } finally {
       setIsAnalysisLoading(false);
     }
-  }, [analysis]);
+  }, []);
 
   // 3. Load Portfolio
   const loadPortfolioData = useCallback(async () => {

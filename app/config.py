@@ -45,7 +45,7 @@ class Settings(BaseModel):
     max_spread_pct: float = 0.5          # Reject trades if bid-ask spread > 0.5%
     
     # Server configuration
-    host: str = os.getenv("HOST", "127.0.0.1")
+    host: str = os.getenv("HOST", "0.0.0.0")
     port: int = int(os.getenv("PORT", "8000"))
 
 # Singleton settings instance that can be dynamically updated via UI settings
