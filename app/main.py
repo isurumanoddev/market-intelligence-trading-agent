@@ -1,15 +1,27 @@
 import os
+import sys
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from app.api.routes import router as api_router
 from app.config import settings
+from app.services.entry_alert_watcher import entry_alert_watcher
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    if "pytest" not in sys.modules and getattr(settings, "btc_alert_watcher_enabled", True):
+        await entry_alert_watcher.start()
+    yield
+    if "pytest" not in sys.modules:
+        await entry_alert_watcher.stop()
 
 app = FastAPI(
     title="Market Intelligence & AI Trading Decision Agent",
     description="Real-time multi-source data ingestion (prices, order book, trade tape, volume, news) with Gemini multi-agent reasoning and paper trading.",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 # CORS configuration

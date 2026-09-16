@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { 
   BotConfig, 
   BotStats, 
@@ -9,8 +9,10 @@ import {
   BacktestRequest, 
   BacktestResult, 
   BacktestTrade, 
-  EquityPoint 
+  EquityPoint,
+  CoinInfo
 } from "@/types/market";
+import { fetchCoins } from "@/lib/api";
 
 interface TradingBotStudioModalProps {
   isOpen: boolean;
@@ -23,6 +25,57 @@ export function TradingBotStudioModal({ isOpen, onClose, currentSymbol }: Tradin
   
   // ------------------ Backtest State ------------------
   const [btSymbol, setBtSymbol] = useState(currentSymbol || "BTC/USDT");
+  const [allCoins, setAllCoins] = useState<CoinInfo[]>([]);
+
+  useEffect(() => {
+    if (isOpen && allCoins.length === 0) {
+      fetchCoins({ limit: 120 }).then((res) => {
+        if (res && res.coins && res.coins.length > 0) {
+          setAllCoins(res.coins);
+        }
+      }).catch(() => {});
+    }
+  }, [isOpen, allCoins.length]);
+
+  const categorizedCoins = useMemo(() => {
+    if (!allCoins || allCoins.length === 0) {
+      return [
+        { label: "🔥 Top Volume Majors", coins: [
+          { symbol: "BTC/USDT", name: "Bitcoin" },
+          { symbol: "ETH/USDT", name: "Ethereum" },
+          { symbol: "SOL/USDT", name: "Solana" },
+          { symbol: "BNB/USDT", name: "BNB" },
+          { symbol: "XRP/USDT", name: "XRP" },
+          { symbol: "SUI/USDT", name: "Sui" },
+        ]},
+        { label: "🐕 Memes", coins: [
+          { symbol: "DOGE/USDT", name: "Dogecoin" },
+          { symbol: "PEPE/USDT", name: "Pepe" },
+          { symbol: "WIF/USDT", name: "dogwifhat" },
+          { symbol: "BONK/USDT", name: "Bonk" },
+        ]},
+      ];
+    }
+    const categories: { [k: string]: { label: string; coins: CoinInfo[] } } = {
+      L1_L2: { label: "⚡ Layer 1 / Layer 2", coins: [] },
+      MEME: { label: "🐕 Memes & High Volatility", coins: [] },
+      AI_DEPIN: { label: "🤖 AI & DePIN", coins: [] },
+      DEFI: { label: "💎 DeFi & DEX Protocols", coins: [] },
+      RWA_INFRA: { label: "🏛️ RWA & Infrastructure", coins: [] },
+      GAMING: { label: "🎮 Gaming & Metaverse", coins: [] },
+    };
+    const topVolume: CoinInfo[] = [];
+    allCoins.forEach((c) => {
+      if (c.is_high_volume) topVolume.push(c);
+      if (categories[c.category]) {
+        categories[c.category].coins.push(c);
+      }
+    });
+    return [
+      { label: "🔥 Top Volume (Hot)", coins: topVolume },
+      ...Object.values(categories).filter((cat) => cat.coins.length > 0),
+    ];
+  }, [allCoins]);
   const [btStrategy, setBtStrategy] = useState<
     | "EMA_RSI"
     | "MACD"
@@ -31,6 +84,10 @@ export function TradingBotStudioModal({ isOpen, onClose, currentSymbol }: Tradin
     | "NEWS_MACRO_MOMENTUM"
     | "QUANT_ALPHA_CONFLUENCE"
     | "CONFLUENCE"
+    | "SUPERTREND_ATR"
+    | "SMART_MONEY_FVG"
+    | "STOCH_RSI_CROSS"
+    | "VWAP_MEAN_REVERSION"
   >("QUANT_ALPHA_CONFLUENCE");
   const [btTimeframe, setBtTimeframe] = useState("1h");
   const [btDays, setBtDays] = useState(90);
@@ -50,7 +107,7 @@ export function TradingBotStudioModal({ isOpen, onClose, currentSymbol }: Tradin
   // Bot Config Form
   const [botStrategy, setBotStrategy] = useState("TECHNICAL_MOMENTUM");
   const [minConviction, setMinConviction] = useState(70);
-  const [tradeSizeUsd, setTradeSizeUsd] = useState(2000);
+  const [tradeSizeUsd, setTradeSizeUsd] = useState(10);
   const [maxPositions, setMaxPositions] = useState(3);
   const [trailingEnabled, setTrailingEnabled] = useState(true);
   const [trailingPct, setTrailingPct] = useState(1.5);
@@ -309,12 +366,17 @@ export function TradingBotStudioModal({ isOpen, onClose, currentSymbol }: Tradin
                   <select
                     value={btSymbol}
                     onChange={(e) => setBtSymbol(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-white font-bold"
+                    className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-white font-bold text-xs"
                   >
-                    <option value="BTC/USDT">BTC/USDT</option>
-                    <option value="ETH/USDT">ETH/USDT</option>
-                    <option value="SOL/USDT">SOL/USDT</option>
-                    <option value="XRP/USDT">XRP/USDT</option>
+                    {categorizedCoins.map((cat) => (
+                      <optgroup key={cat.label} label={cat.label} className="bg-slate-900 text-slate-300 font-bold">
+                        {cat.coins.map((c) => (
+                          <option key={c.symbol} value={c.symbol} className="bg-[#0c101d] text-white font-mono">
+                            {c.symbol} - {c.name}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))}
                   </select>
                 </div>
 
@@ -326,6 +388,10 @@ export function TradingBotStudioModal({ isOpen, onClose, currentSymbol }: Tradin
                     className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-cyan-300 font-bold"
                   >
                     <option value="QUANT_ALPHA_CONFLUENCE">Quant Alpha Master (Multi-Regime Confluence)</option>
+                    <option value="SUPERTREND_ATR">Supertrend ATR Volatility Trend (10, 3.0)</option>
+                    <option value="SMART_MONEY_FVG">Smart Money Concepts (FVG Liquidity Imbalance)</option>
+                    <option value="STOCH_RSI_CROSS">Stochastic RSI Double-Bottom Reversal</option>
+                    <option value="VWAP_MEAN_REVERSION">VWAP Multi-Sigma Band Mean Reversion</option>
                     <option value="NEWS_MACRO_MOMENTUM">News Sentiment & Macro Momentum (Fed, CPI, Flows)</option>
                     <option value="DERIVATIVES_SQUEEZE">Derivatives Liquidity Squeeze (Funding Rate Arbitrage)</option>
                     <option value="BOLLINGER_REVERSION">Bollinger Mean Reversion (Volatility Scalper)</option>
@@ -811,7 +877,7 @@ export function TradingBotStudioModal({ isOpen, onClose, currentSymbol }: Tradin
                     <label className="text-[10px] text-slate-400 block mb-1 uppercase">Position Size ($ USD)</label>
                     <input
                       type="number"
-                      step="500"
+                      step="1"
                       value={tradeSizeUsd}
                       onChange={(e) => setTradeSizeUsd(Number(e.target.value))}
                       className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-white"

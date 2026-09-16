@@ -1,5 +1,6 @@
 import {
   FullAnalysisData,
+  CoinInfo,
   Candle,
   PortfolioState,
   SettingsData,
@@ -10,25 +11,32 @@ import {
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ||
   (typeof window !== "undefined"
-    ? `${window.location.protocol}//${window.location.hostname}:8000/api`
+    ? "/api"
     : "http://127.0.0.1:8000/api");
 
-export async function fetchAnalysis(symbol: string): Promise<FullAnalysisData> {
-  try {
-    const res = await fetch(`${API_BASE}/analysis?symbol=${encodeURIComponent(symbol)}`, {
-      cache: "no-store",
-    });
-    if (!res.ok) {
-      const errorData = await res.json().catch(() => ({ detail: `HTTP ${res.status}: Failed to fetch analysis` }));
-      throw new Error(errorData.detail || "Failed to fetch analysis");
+export async function fetchAnalysis(symbol: string, retries: number = 2): Promise<FullAnalysisData> {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch(`${API_BASE}/analysis?symbol=${encodeURIComponent(symbol)}`, {
+        cache: "no-store",
+      });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ detail: `HTTP ${res.status}: Failed to fetch analysis` }));
+        throw new Error(errorData.detail || "Failed to fetch analysis");
+      }
+      return await res.json();
+    } catch (err: any) {
+      if (attempt < retries) {
+        await new Promise((resolve) => setTimeout(resolve, 1200));
+        continue;
+      }
+      if (err.message && (err.message.includes("Failed to fetch") || err.message.includes("NetworkError") || err.message.includes("refused") || err.message.includes("fetch failed"))) {
+        throw new Error("Cannot connect to FastAPI backend at http://127.0.0.1:8000. Please make sure the Python server is running (`python run.py`).");
+      }
+      throw err;
     }
-    return res.json();
-  } catch (err: any) {
-    if (err.message && (err.message.includes("Failed to fetch") || err.message.includes("NetworkError") || err.message.includes("refused"))) {
-      throw new Error("Cannot connect to FastAPI backend at http://127.0.0.1:8000. Please make sure the Python server is running (`python run.py`).");
-    }
-    throw err;
   }
+  throw new Error("Failed to fetch analysis");
 }
 
 export async function fetchCandles(symbol: string, timeframe: string = "1h", limit: number = 45): Promise<Candle[]> {
@@ -53,8 +61,10 @@ export async function executeTrade(payload: {
   side: "BUY" | "SELL";
   price: number;
   amount: number;
+  leverage?: number;
   stop_loss?: number;
   take_profit?: number;
+  broker_type?: string;
   reason?: string;
 }) {
   const res = await fetch(`${API_BASE}/portfolio/trade`, {
@@ -100,6 +110,11 @@ export async function fetchSettings(): Promise<SettingsData> {
 
 export async function updateSettings(payload: {
   gemini_api_key?: string;
+  coinglass_api_key?: string;
+  binance_testnet_api_key?: string;
+  binance_testnet_secret?: string;
+  bybit_testnet_api_key?: string;
+  bybit_testnet_secret?: string;
   default_exchange?: string;
   max_risk_per_trade_pct?: number;
   max_spread_pct?: number;
@@ -128,3 +143,77 @@ export async function fetchLLMPrediction(
   return res.json();
 }
 
+export async function fetchAccuracyRating(symbol: string) {
+  const res = await fetch(`${API_BASE}/market/accuracy-rating?symbol=${encodeURIComponent(symbol)}`, {
+    cache: "no-store",
+  });
+  if (!res.ok) return null;
+  return res.json();
+}
+
+export async function fetchExchangeStatus() {
+  const res = await fetch(`${API_BASE}/portfolio/exchange-status`, { cache: "no-store" });
+  if (!res.ok) return null;
+  return res.json();
+}
+
+export async function fetchTradingViewWebhookTemplate(params: {
+  symbol: string;
+  side: string;
+  price: number;
+  amount: number;
+  leverage?: number;
+  stop_loss?: number;
+  take_profit?: number;
+}) {
+  const query = new URLSearchParams({
+    symbol: params.symbol,
+    side: params.side,
+    price: params.price.toString(),
+    amount: params.amount.toString(),
+    leverage: (params.leverage || 1).toString(),
+    ...(params.stop_loss ? { stop_loss: params.stop_loss.toString() } : {}),
+    ...(params.take_profit ? { take_profit: params.take_profit.toString() } : {}),
+  });
+  const res = await fetch(`${API_BASE}/portfolio/tradingview-webhook-template?${query.toString()}`, {
+    cache: "no-store",
+  });
+  if (!res.ok) return null;
+  return res.json();
+}
+
+export async function fetchCoins(params?: {
+  category?: string;
+  search?: string;
+  sort_by?: string;
+  limit?: number;
+}): Promise<{ status: string; total: number; coins: CoinInfo[] }> {
+  try {
+    const query = new URLSearchParams();
+    if (params?.category) query.set("category", params.category);
+    if (params?.search) query.set("search", params.search);
+    if (params?.sort_by) query.set("sort_by", params.sort_by);
+    if (params?.limit) query.set("limit", params.limit.toString());
+
+    const res = await fetch(`${API_BASE}/market/coins?${query.toString()}`, {
+      cache: "no-store",
+    });
+    if (!res.ok) return { status: "error", total: 0, coins: [] };
+    return res.json();
+  } catch {
+    return { status: "error", total: 0, coins: [] };
+  }
+}
+
+export async function fetchTopVolumeCoins(limit: number = 20): Promise<CoinInfo[]> {
+  try {
+    const res = await fetch(`${API_BASE}/market/top-volume?limit=${limit}`, {
+      cache: "no-store",
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.coins || [];
+  } catch {
+    return [];
+  }
+}

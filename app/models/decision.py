@@ -9,11 +9,25 @@ class TechnicalIndicators(BaseModel):
     ema_20: Optional[float] = None
     ema_50: Optional[float] = None
     ema_200: Optional[float] = None
+    sma_20: Optional[float] = None
+    sma_50: Optional[float] = None
+    sma_200: Optional[float] = None
     vwap: Optional[float] = None
+    vwap_upper_1: Optional[float] = None
+    vwap_lower_1: Optional[float] = None
     atr: Optional[float] = None
     bb_upper: Optional[float] = None
     bb_middle: Optional[float] = None
     bb_lower: Optional[float] = None
+    supertrend_value: Optional[float] = None
+    supertrend_direction: str = "BULLISH"  # BULLISH, BEARISH
+    stoch_k: Optional[float] = None
+    stoch_d: Optional[float] = None
+    adx: Optional[float] = None
+    adx_trend_strength: str = "TRENDING"  # STRONG_TREND, TRENDING, RANGING, WEAK
+    fvg_detected: bool = False
+    fvg_type: str = "NONE"  # BULLISH_FVG, BEARISH_FVG, NONE
+    fvg_price_level: Optional[float] = None
     trend_state: str = "NEUTRAL"  # BULLISH, BEARISH, NEUTRAL
     rsi_state: str = "NEUTRAL"    # OVERSOLD, OVERBOUGHT, NEUTRAL
 
@@ -133,11 +147,16 @@ class PaperPosition(BaseModel):
     current_price: float
     amount: float
     cost_basis: float
+    margin: float = 0.0
+    leverage: float = 1.0
+    liquidation_price: Optional[float] = None
     current_value: float
     unrealized_pnl: float
     unrealized_pnl_pct: float
     stop_loss: Optional[float] = None
     take_profit: Optional[float] = None
+    broker_type: str = "LOCAL"  # LOCAL, BINANCE_TESTNET, BYBIT_TESTNET
+    exchange_watch_url: Optional[str] = None
     opened_at: str
 
 class PaperTradeRecord(BaseModel):
@@ -147,9 +166,24 @@ class PaperTradeRecord(BaseModel):
     price: float
     amount: float
     value: float
+    leverage: float = 1.0
     pnl: float = 0.0
+    broker_type: str = "LOCAL"
+    exchange_watch_url: Optional[str] = None
     reason: str = ""
     timestamp: str
+
+class AccuracySetupRating(BaseModel):
+    symbol: str
+    grade: str = "B"                      # A+, A, B, C
+    win_rate_expectancy: float = 60.0    # 78.4%, 68.5%, 55.0%, 42.0%
+    mtf_alignment: str = "NEUTRAL"       # STRONG_BULLISH_4X, BULLISH_3X, NEUTRAL_CHOP, BEARISH_3X, STRONG_BEARISH_4X
+    mtf_score: int = 2                   # Number of timeframes aligned (0-4)
+    cvd_divergence: str = "NONE"         # BULLISH_ABSORPTION, BEARISH_EXHAUSTION, NONE
+    funding_alignment: str = "FAVORABLE" # FAVORABLE, CROWDED, NEUTRAL
+    key_reasons: List[str] = []
+    recommended_action: str = "WAIT"     # EXECUTE_LONG, EXECUTE_SHORT, WAIT_CONFIRMATION
+    timestamp: str = ""
 
 class PortfolioState(BaseModel):
     cash: float
