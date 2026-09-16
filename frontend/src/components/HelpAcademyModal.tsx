@@ -30,7 +30,7 @@ interface HelpAcademyModalProps {
   onClose: () => void;
 }
 
-type TabType = "beginner" | "predict" | "bot" | "llm" | "glossary";
+type TabType = "beginner" | "predict" | "optimal" | "bot" | "llm" | "glossary";
 
 interface GlossaryItem {
   term: string;
@@ -219,6 +219,18 @@ export const HelpAcademyModal: React.FC<HelpAcademyModalProps> = ({
           >
             <TrendingUp className="w-3.5 h-3.5" />
             <span>Market Prediction</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("optimal")}
+            className={`px-3.5 py-2.5 font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
+              activeTab === "optimal"
+                ? "border-emerald-400 text-emerald-300 bg-emerald-950/20"
+                : "border-transparent text-slate-400 hover:text-slate-200"
+            }`}
+          >
+            <Target className="w-3.5 h-3.5 text-emerald-400" />
+            <span>🎯 A-Z Optimal Playbook</span>
           </button>
 
           <button
@@ -494,7 +506,265 @@ export const HelpAcademyModal: React.FC<HelpAcademyModalProps> = ({
             </div>
           )}
 
-          {/* ===================== TAB 3: TRADING BOT GUIDE ===================== */}
+          {/* ===================== TAB: A TO Z OPTIMAL TRADING PLAYBOOK ===================== */}
+          {activeTab === "optimal" && (
+            <div className="space-y-6">
+              {/* Header Banner */}
+              <div className="bg-gradient-to-r from-emerald-950/40 via-slate-900/50 to-cyan-950/40 border border-emerald-500/40 rounded-xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-lg">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/20 border border-emerald-500/40 text-emerald-300">
+                      MASTER OPERATING MANUAL
+                    </span>
+                    <span className="text-xs text-slate-400 font-mono">Institutional Confluence Architecture</span>
+                  </div>
+                  <h3 className="text-base sm:text-lg font-bold text-white mt-1">
+                    A to Z Playbook: How to Achieve Highest Win-Rate Trading
+                  </h3>
+                  <p className="text-xs text-slate-300 mt-1 max-w-3xl leading-relaxed">
+                    This terminal was engineered to replace emotional guesswork with mathematical edge. Follow this exact routine to protect capital, eliminate false counter-trend signals, and capture high-probability asymmetric swings.
+                  </p>
+                </div>
+                <div className="px-3 py-2 rounded-lg bg-slate-950/90 border border-emerald-500/50 text-emerald-300 font-mono text-xs font-bold shrink-0 flex flex-col items-center">
+                  <span className="text-[10px] text-slate-400 uppercase tracking-wider">Golden Rule #1</span>
+                  <span>Cash is a Position</span>
+                </div>
+              </div>
+
+              {/* Section 1: The Confluence Hierarchy */}
+              <div>
+                <h4 className="text-sm font-bold text-emerald-400 uppercase tracking-wider font-mono mb-3 flex items-center gap-2">
+                  <Layers className="w-4 h-4" /> 1. The Confluence Hierarchy: Never Fight the Consensus
+                </h4>
+                <p className="text-xs text-slate-300 mb-3 leading-relaxed">
+                  Before clicking any button, your eyes must always follow this 3-tier inspection hierarchy. Only execute when all three tiers align in the same direction:
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="bg-[#080d1a] border border-cyan-500/30 rounded-lg p-4 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-mono font-bold text-cyan-300">Tier 1: 12-Indicator Consensus</span>
+                      <span className="text-[9px] font-mono bg-cyan-950 px-1.5 py-0.5 rounded border border-cyan-800 text-cyan-300">Dominant Bias</span>
+                    </div>
+                    <p className="text-xs text-slate-300 leading-relaxed">
+                      Check the colored consensus bar directly above the chart:
+                    </p>
+                    <ul className="text-[11px] font-mono space-y-1 text-slate-300">
+                      <li className="text-emerald-300">🟢 <strong>Green ≥ 70% (8+ Bullish):</strong> Only look for LONG pullbacks.</li>
+                      <li className="text-rose-300">🔴 <strong>Red ≥ 70% (8+ Bearish):</strong> Only look for SHORT retests.</li>
+                      <li className="text-amber-300">🟡 <strong>Grey / Split (Chop):</strong> NO TRADE. Stand aside and wait.</li>
+                    </ul>
+                  </div>
+
+                  <div className="bg-[#080d1a] border border-purple-500/30 rounded-lg p-4 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-mono font-bold text-purple-300">Tier 2: Gemini 3.7 Master Arbiter</span>
+                      <span className="text-[9px] font-mono bg-purple-950 px-1.5 py-0.5 rounded border border-purple-800 text-purple-300">AI Synthesis</span>
+                    </div>
+                    <p className="text-xs text-slate-300 leading-relaxed">
+                      Gemini reviews Level 2 Order Book Imbalance, CVD absorption, and Funding rates:
+                    </p>
+                    <ul className="text-[11px] font-mono space-y-1 text-slate-300">
+                      <li>• <strong>Conviction &gt; 65%:</strong> High institutional probability.</li>
+                      <li>• <strong>STRONG BUY / SELL:</strong> Full alignment.</li>
+                      <li>• <strong>Warning:</strong> If AI says SELL while you want to Buy, DO NOT trade!</li>
+                    </ul>
+                  </div>
+
+                  <div className="bg-[#080d1a] border border-emerald-500/30 rounded-lg p-4 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-mono font-bold text-emerald-300">Tier 3: 10 Algorithmic Strategies</span>
+                      <span className="text-[9px] font-mono bg-emerald-950 px-1.5 py-0.5 rounded border border-emerald-800 text-emerald-300">Execution Trigger</span>
+                    </div>
+                    <p className="text-xs text-slate-300 leading-relaxed">
+                      Evaluates Supertrend, SMC Fair Value Gaps, EMA 20/50, and VWAP bands:
+                    </p>
+                    <ul className="text-[11px] font-mono space-y-1 text-slate-300">
+                      <li>• <strong>Strong Agreement (7+):</strong> Maximum conviction.</li>
+                      <li>• <strong>High Conflict (5 vs 5):</strong> Never force a trade during a 50/50 split!</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 2: Step-by-Step A to Z Execution Checklist */}
+              <div>
+                <h4 className="text-sm font-bold text-cyan-400 uppercase tracking-wider font-mono mb-3 flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4" /> 2. Step-by-Step A to Z Execution Routine
+                </h4>
+                <div className="space-y-2.5">
+                  <div className="bg-[#080d1a] border border-slate-800 rounded-lg p-3.5 flex items-start gap-3">
+                    <span className="w-6 h-6 rounded-full bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 font-mono font-bold flex items-center justify-center text-xs shrink-0 mt-0.5">A</span>
+                    <div className="space-y-1">
+                      <div className="text-xs font-bold text-white font-mono flex items-center gap-2">
+                        Select Your Coin &amp; Check Multi-Timeframe Trend
+                      </div>
+                      <p className="text-xs text-slate-300">
+                        Click the Search bar or Coin Catalog in the header. Select high-liquidity coins (BTC, ETH, SOL, SUI, NEAR). Check the <strong>Monthly Context</strong> badge (Expansion, Accumulation, or Breakdown) to ensure you are trading in the direction of macro flows.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="bg-[#080d1a] border border-slate-800 rounded-lg p-3.5 flex items-start gap-3">
+                    <span className="w-6 h-6 rounded-full bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 font-mono font-bold flex items-center justify-center text-xs shrink-0 mt-0.5">B</span>
+                    <div className="space-y-1">
+                      <div className="text-xs font-bold text-white font-mono flex items-center gap-2">
+                        Inspect the Floating Entry HUD (Optimal Trade Entry - OTE)
+                      </div>
+                      <p className="text-xs text-slate-300">
+                        Look at the floating card in the top-left of the chart. Keep mode on <strong className="text-purple-300 font-mono">[ 🤖 AI AUTO ]</strong> so the tool automatically prevents counter-trend traps. Check the <strong>Setup Grade</strong>:
+                      </p>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 font-mono text-[11px]">
+                        <div className="p-1.5 rounded bg-emerald-950/40 border border-emerald-500/40 text-emerald-300">
+                          <strong>Grade A+ (≥ 80%):</strong> Prime trade. Full size ($10 @ 10x).
+                        </div>
+                        <div className="p-1.5 rounded bg-cyan-950/40 border border-cyan-500/40 text-cyan-300">
+                          <strong>Grade A (68-79%):</strong> Strong setup. Standard entry.
+                        </div>
+                        <div className="p-1.5 rounded bg-amber-950/40 border border-amber-500/40 text-amber-300">
+                          <strong>Grade B (55-67%):</strong> Wait for retest or half size ($5).
+                        </div>
+                        <div className="p-1.5 rounded bg-rose-950/40 border border-rose-500/40 text-rose-300">
+                          <strong>Grade C (&lt; 55%):</strong> DO NOT TRADE. Extreme risk.
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-[#080d1a] border border-slate-800 rounded-lg p-3.5 flex items-start gap-3">
+                    <span className="w-6 h-6 rounded-full bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 font-mono font-bold flex items-center justify-center text-xs shrink-0 mt-0.5">C</span>
+                    <div className="space-y-1">
+                      <div className="text-xs font-bold text-white font-mono flex items-center gap-2">
+                        Choose &quot;Optimal Pullback / Retest&quot; Over &quot;Current Market&quot;
+                      </div>
+                      <p className="text-xs text-slate-300">
+                        Always click <strong className="text-emerald-300 font-mono">🎯 Optimal Pullback / Retest</strong>. Professional traders do not market-buy at resistance or market-short at support. Limit orders entering on dynamic pullbacks (EMA 20, VWAP median, or FVG retests) guarantee a minimum <strong className="text-white">1:2 to 1:3.5 Risk-to-Reward ratio</strong>!
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="bg-[#080d1a] border border-slate-800 rounded-lg p-3.5 flex items-start gap-3">
+                    <span className="w-6 h-6 rounded-full bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 font-mono font-bold flex items-center justify-center text-xs shrink-0 mt-0.5">D</span>
+                    <div className="space-y-1">
+                      <div className="text-xs font-bold text-white font-mono flex items-center gap-2">
+                        Execute via Paper Trade or Export to TradingView / WhatsApp
+                      </div>
+                      <p className="text-xs text-slate-300">
+                        You have 3 powerful ways to deploy your trade plan:
+                      </p>
+                      <ul className="text-xs font-mono space-y-1 text-slate-300 pt-0.5">
+                        <li>• <strong className="text-cyan-300">⚡ 1-Click Paper Trade:</strong> Places a simulated order stored in your local portfolio database with exact SL and TP targets.</li>
+                        <li>• <strong className="text-emerald-300">📋 Pine Script:</strong> Click <em>Pine</em> to copy the generated script. Paste into TradingView Pine Editor to see your exact Entry, Stop Loss, and TP1/TP2 lines on your phone or desktop!</li>
+                        <li>• <strong className="text-purple-300">📱 WhatsApp Alert:</strong> Click <em>WhatsApp</em> to send the full trade signal instantly to your phone so you never miss a level while away from your computer.</li>
+                      </ul>
+                    </div>
+                  </div>
+
+                  <div className="bg-[#080d1a] border border-slate-800 rounded-lg p-3.5 flex items-start gap-3">
+                    <span className="w-6 h-6 rounded-full bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 font-mono font-bold flex items-center justify-center text-xs shrink-0 mt-0.5">E</span>
+                    <div className="space-y-1">
+                      <div className="text-xs font-bold text-white font-mono flex items-center gap-2">
+                        Trade Management &amp; The &quot;Free Roll&quot; Technique
+                      </div>
+                      <p className="text-xs text-slate-300">
+                        Once your trade is open, follow this institutional profit management rule:
+                      </p>
+                      <div className="p-2.5 rounded bg-slate-900/80 border border-slate-800 text-[11px] font-mono text-slate-300 space-y-1">
+                        <div>1. When price hits <strong className="text-emerald-400">TP1 (1:2 R:R)</strong>: Close 50% of the position and lock in profit.</div>
+                        <div>2. Immediately move your <strong className="text-rose-400">Stop Loss to Breakeven (Entry Price)</strong>.</div>
+                        <div>3. You now have a <strong className="text-cyan-300">Risk-Free Trade</strong>! Let the remaining 50% run to <strong className="text-emerald-300">TP2 (1:3.5 R:R)</strong>.</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 3: Understanding Contrarian Warnings & The Falling Knife Trap */}
+              <div>
+                <h4 className="text-sm font-bold text-rose-400 uppercase tracking-wider font-mono mb-3 flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4" /> 3. The &quot;Falling Knife&quot; Trap: Why Counters Never Work
+                </h4>
+                <div className="bg-[#080d1a] border border-rose-500/40 rounded-lg p-4 space-y-3">
+                  <div className="flex items-center gap-2 text-rose-300 font-bold font-mono text-xs">
+                    <span>⚠️ Classic Novice Mistake: Buying Because Price &quot;Looks Cheap&quot;</span>
+                  </div>
+                  <p className="text-xs text-slate-300 leading-relaxed">
+                    If 9 out of 12 indicators are BEARISH, the AI Master Arbiter says STRONG SELL, and price is plunging below all moving averages (EMA Death Cross):
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-mono">
+                    <div className="bg-rose-950/30 border border-rose-800/60 p-3 rounded text-rose-200 space-y-1">
+                      <strong className="text-rose-400 block font-bold">❌ What Gamblers Do (Wiping Accounts):</strong>
+                      <p className="text-[11px]">They try to &quot;catch the bottom&quot; by going Long into free-falling red candles. A 10x Long on a cascading market leads to immediate liquidation.</p>
+                    </div>
+                    <div className="bg-emerald-950/30 border border-emerald-800/60 p-3 rounded text-emerald-200 space-y-1">
+                      <strong className="text-emerald-400 block font-bold">✓ What Quant Traders Do (Making Money):</strong>
+                      <p className="text-[11px]">They switch the HUD to <strong>🔴 SHORT</strong>. They wait for price to bounce up to the 20 EMA or VWAP resistance, and enter a high-probability SHORT with the trend!</p>
+                    </div>
+                  </div>
+                  <div className="text-[11px] font-mono text-amber-300 bg-amber-950/30 p-2.5 rounded border border-amber-800/50">
+                    <strong>Institutional Shield Rule:</strong> If the HUD displays an amber warning banner: <em>&quot;⚠️ CONTRARIAN WARNING: Counter-trend Long against Bearish Indicators&quot;</em>, the system has automatically downgraded the setup to Grade C. Do not trade against the consensus!
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 4: Optimal Risk & Leverage Mathematics */}
+              <div>
+                <h4 className="text-sm font-bold text-amber-400 uppercase tracking-wider font-mono mb-3 flex items-center gap-2">
+                  <Shield className="w-4 h-4" /> 4. Risk &amp; Leverage Math (Testing with Real Safety)
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="bg-[#080d1a] border border-slate-800 p-3.5 rounded-lg space-y-1.5">
+                    <div className="text-xs font-mono font-bold text-amber-300">Default $200 Account</div>
+                    <p className="text-slate-300 text-[11px] leading-relaxed">
+                      The paper trading broker defaults to $200 USD. This simulates a realistic retail testing balance. Do not practice with fake $100,000 balances—it ruins your psychological discipline!
+                    </p>
+                  </div>
+
+                  <div className="bg-[#080d1a] border border-slate-800 p-3.5 rounded-lg space-y-1.5">
+                    <div className="text-xs font-mono font-bold text-amber-300">$10 Margin @ 10x ($100 Notional)</div>
+                    <p className="text-slate-300 text-[11px] leading-relaxed">
+                      With 10x leverage, your $10 margin controls $100 notional. A 1.8% Stop Loss means your maximum loss on a losing trade is only <strong>$1.80</strong> (less than 1% of your $200 account).
+                    </p>
+                  </div>
+
+                  <div className="bg-[#080d1a] border border-slate-800 p-3.5 rounded-lg space-y-1.5">
+                    <div className="text-xs font-mono font-bold text-amber-300">The 4-Day Trial Routine</div>
+                    <p className="text-slate-300 text-[11px] leading-relaxed">
+                      Trade exclusively in Paper Trading for 4 to 5 consecutive days. Track your Win Rate in the Portfolio footer. Only when you consistently achieve &gt; 65% win rate should you connect real capital!
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 5: Summary Golden Rules Card */}
+              <div className="bg-gradient-to-r from-slate-900 via-[#0a1224] to-slate-900 border border-cyan-500/40 rounded-xl p-4 sm:p-5">
+                <h4 className="text-xs font-bold text-cyan-300 uppercase tracking-wider font-mono mb-2.5 flex items-center gap-2">
+                  <Zap className="w-4 h-4 text-cyan-400" /> Quick-Reference Summary Checklist
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-mono text-slate-300">
+                  <div className="flex items-center gap-2 bg-slate-950/60 p-2 rounded border border-slate-800">
+                    <span className="text-emerald-400 font-bold">1.</span> Always check 12-Indicator bar (≥ 70% consensus required).
+                  </div>
+                  <div className="flex items-center gap-2 bg-slate-950/60 p-2 rounded border border-slate-800">
+                    <span className="text-emerald-400 font-bold">2.</span> Keep Entry HUD on [ 🤖 AI AUTO ] for automatic bias protection.
+                  </div>
+                  <div className="flex items-center gap-2 bg-slate-950/60 p-2 rounded border border-slate-800">
+                    <span className="text-emerald-400 font-bold">3.</span> Only execute Grade A or A+ setups (skip B and C).
+                  </div>
+                  <div className="flex items-center gap-2 bg-slate-950/60 p-2 rounded border border-slate-800">
+                    <span className="text-emerald-400 font-bold">4.</span> Choose &quot;Optimal Limit Entry&quot; instead of market orders.
+                  </div>
+                  <div className="flex items-center gap-2 bg-slate-950/60 p-2 rounded border border-slate-800">
+                    <span className="text-emerald-400 font-bold">5.</span> When TP1 is hit, take 50% profit &amp; move SL to breakeven.
+                  </div>
+                  <div className="flex items-center gap-2 bg-slate-950/60 p-2 rounded border border-slate-800">
+                    <span className="text-emerald-400 font-bold">6.</span> Test on paper trade for at least 4-5 days before real money.
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ===================== TAB 4: TRADING BOT GUIDE ===================== */}
           {activeTab === "bot" && (
             <div className="space-y-6">
               <div className="border-b border-slate-800 pb-3">
